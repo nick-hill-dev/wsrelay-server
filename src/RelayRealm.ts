@@ -1,10 +1,13 @@
 import RelayUser from "./RelayUser";
 
-export default class Realm {
+export default class RelayRealm {
 
-    public users: RelayUser[] = [];
+    public readonly users: RelayUser[] = [];
+
+    public readonly childRealms: RelayRealm[] = [];
 
     public constructor(
+        public readonly parentRealm: RelayRealm,
         public readonly id: number
     ) {
     }

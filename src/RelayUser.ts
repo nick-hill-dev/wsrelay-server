@@ -1,3 +1,4 @@
+import { connection } from "websocket";
 import RelayRealm from "./RelayRealm";
 
 export default class RelayUser {
@@ -6,7 +7,7 @@ export default class RelayUser {
 
     public constructor(
         public readonly id: number,
-        public readonly remoteAddress: string
+        public readonly connection: connection
     ) {
     }
 

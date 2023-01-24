@@ -22,6 +22,8 @@
         }
     </style>
     <script>
+        let client;
+
         function log(text) {
             let p = document.createElement('p');
             p.textContent = text;
@@ -33,38 +35,36 @@
             client.send(command);
         }
 
-        let connectButton = document.createElement('button');
-        connectButton.textContent = 'Connect';
-        document.body.appendChild(connectButton);
-        connectButton.onclick = () => {
+        function connect() {
             let address = 'ws://localhost:22002';
             let protocol = 'relay';
             log(`Connecting to ${address}, protocol ${protocol}`);
-            let client = new WebSocket(address, protocol);
+            client = new WebSocket(address, protocol);
             client.onopen = () => {
                 send(client, '^19');
-
-                document.body.removeChild(connectButton);
-                let disconnectButton = document.createElement('button');
-                disconnectButton.textContent = 'Disconnect';
-                disconnectButton.onclick = () => {
-                    client.close();
-                };
-                document.body.appendChild(disconnectButton);
-
+                send(client, '* Hello World!');
+                document.getElementById('connectButton').disabled = true;
+                document.getElementById('disconnectButton').disabled = false;
             };
             client.onerror = ev => {
                 log(`WebSocket error.`);
             };
             client.onclose = (ev) => {
                 log(`WebSocket closed: ${ev.code}`);
+                document.getElementById('connectButton').disabled = false;
+                document.getElementById('disconnectButton').disabled = true;
             };
             client.onmessage = ev => {
                 log(`In: ${ev.data}`);
             };
-        };
+        }
 
+        function disconnect() {
+            client.close();
+        }
     </script>
+    <button id="connectButton" onclick="connect()">Connect</button>
+    <button id="disconnectButton" disabled="disabled" onclick="disconnect()">Disconnect</button>
 </body>
 
 </html>

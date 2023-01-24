@@ -1,17 +1,17 @@
 'use strict';
 
 let WebSocketServer = require('websocket').server;
-import { server as WSServer } from 'websocket';
+import { connection, server as WSServer } from 'websocket';
 let http = require('http');
 
-const fs = require('fs');
-
 import './IConfig';
-import RelayUser from './RelayUser';
-import RelayRealm from './RelayRealm';
+import RelayManager from './RelayManager';
 
+const fs = require('fs');
 let configText = fs.readFileSync('config.json');
 let config = <IConfig>JSON.parse(configText);
+
+let manager = new RelayManager(config);
 
 let server = http.createServer((request: any, response: any) => {
     console.log(`Received request for: ${request.url}`);
@@ -31,14 +31,6 @@ let wsServer: WSServer = new WebSocketServer({
     httpServer: server,
     autoAcceptConnections: false
 });
-
-let users: RelayUser[] = [];
-
-let availableUserIds: number[] = [];
-
-let realms: RelayRealm[] = [];
-
-let availableRealmIds: number[] = [];
 
 wsServer.on('request', (request) => {
 
@@ -67,31 +59,49 @@ wsServer.on('request', (request) => {
         }
     }
 
-    let connection = request.accept(request.requestedProtocols[0], request.origin);
-    let id = users.length;
-    if (availableUserIds.length > 0) {
-        id = availableUserIds.shift();
-        availableUserIds.sort();
+    // Accept the connection
+    let connection: connection = null;
+    let userId: number = -1;
+    let registered: boolean;
+    try {
+        connection = request.accept(request.requestedProtocols[0], request.origin);
+        userId = manager.registerUser(connection);
+        registered = true;
+        connection.sendUTF(`#${userId}`);
+        console.log(`[${userId}|Connect] ${request.origin}`);
+    } catch (e) {
+        console.error(`[Error] {Accepting Connection} ${e}`);
+        if (registered) {
+            try {
+                manager.unregisterUser(userId);
+            } catch (f) {
+                console.error(`[Error] {Unregistering User} ${e}`);
+            }
+        }
+        return;
     }
-    let user = new RelayUser(id, request.remoteAddress);
-    users[id] = user;
-    connection.sendUTF(`#${id}`);
-    console.log(`[${user.id}|Connect] ${request.origin}`);
 
-    connection.on('message', (message: any) => {
-        if (message.type === 'utf8') {
-            console.log(`[${user.id}|Message|In] ${message.utf8Data}`);
-            connection.sendUTF(message.utf8Data);
-        } else if (message.type === 'binary') {
-            console.log(`[${user.id}|Binary|In] (${message.binaryData.length} bytes.`);
-            connection.sendBytes(message.binaryData);
+    // Handle messages
+    connection.on('message', message => {
+        try {
+            if (message.type === 'utf8') {
+                manager.handleMessage(userId, message.utf8Data);
+            } else if (message.type === 'binary') {
+                console.log(`[${userId}|Binary|In] (${message.binaryData.length} bytes.`);
+            }
+        } catch (e) {
+            console.error(`[Error] {Handling Message} ${e}`);
         }
     });
 
-    connection.on('close', (reasonCode: any, description: any) => {
-        availableUserIds.push(user.id);
-        users[user.id] = undefined;
-        console.log(`[${user.id}|Disconnect] ${connection.remoteAddress} ${reasonCode}: ${description}`);
+    // Handle closing connection
+    connection.on('close', (reasonCode, description) => {
+        try {
+            manager.unregisterUser(userId);
+            console.log(`[${userId}|Disconnect] ${connection.remoteAddress} ${reasonCode}: ${description}`);
+        } catch (e) {
+            console.error(`[Error] {Accepting Disconnection} ${e}`);
+        }
     });
 
 });

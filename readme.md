@@ -257,3 +257,13 @@ Parameter k: The key of the data. Effectively the file name for the data to retr
 Example: `<score`
 
 Example: `<4,score`
+
+### $c - Execute command
+
+Instructs the server to execute a command.
+
+Format: `$c`
+
+Parameter c: The command the server should execute, including parameters.
+
+Example: `$setEmptyRealmLifetime 90`

@@ -1,0 +1,17 @@
+{
+  "name": "wsrelay",
+  "version": "1.0.0",
+  "description": "WebSocket Relay Server",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "wsrelay"
+  ],
+  "author": "Nicholas Hill",
+  "license": "ISC",
+  "dependencies": {
+    "websocket": "^1.0.34"
+  }
+}

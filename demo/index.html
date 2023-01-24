@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta charset="utf-8" />
+    <title>WebSocket Relay Tester</title>
+</head>
+
+<body>
+    <style>
+        p,
+        button {
+            font-family: Consolas;
+            font-size: 12t;
+            color: blue;
+            line-height: 0;
+        }
+
+        button {
+            height: 20pt;
+        }
+    </style>
+    <script>
+        function log(text) {
+            let p = document.createElement('p');
+            p.textContent = text;
+            document.body.appendChild(p);
+        }
+
+        function send(client, command) {
+            log(`Out: ${command}`);
+            client.send(command);
+        }
+
+        let connectButton = document.createElement('button');
+        connectButton.textContent = 'Connect';
+        document.body.appendChild(connectButton);
+        connectButton.onclick = () => {
+            let address = 'ws://localhost:22002';
+            let protocol = 'relay';
+            log(`Connecting to ${address}, protocol ${protocol}`);
+            let client = new WebSocket(address, protocol);
+            client.onopen = () => {
+                send(client, '^19');
+
+                document.body.removeChild(connectButton);
+                let disconnectButton = document.createElement('button');
+                disconnectButton.textContent = 'Disconnect';
+                disconnectButton.onclick = () => {
+                    client.close();
+                };
+                document.body.appendChild(disconnectButton);
+
+            };
+            client.onerror = ev => {
+                log(`WebSocket error.`);
+            };
+            client.onclose = (ev) => {
+                log(`WebSocket closed: ${ev.code}`);
+            };
+            client.onmessage = ev => {
+                log(`In: ${ev.data}`);
+            };
+        };
+
+    </script>
+</body>
+
+</html>

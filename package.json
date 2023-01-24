@@ -12,10 +12,11 @@
   "author": "Nicholas Hill",
   "license": "ISC",
   "dependencies": {
+    "@types/websocket": "^1.0.5",
     "websocket": "^1.0.34"
   },
   "devDependencies": {
-    "ts-node": "^10.9.1",
-    "@types/node": "^18.11.18"
+    "@types/node": "^18.11.18",
+    "ts-node": "^10.9.1"
   }
 }

@@ -222,7 +222,7 @@ export default class RelayManager {
         let newRealm: RelayRealm = null;
         let creatingOrJoiningRealm = targetRealmId !== -1;
         if (creatingOrJoiningRealm) {
-            let newRealm = this.realms[targetRealmId];
+            newRealm = this.realms[targetRealmId];
             if (!newRealm) {
                 let parentRealm = createChildRealm ? oldRealm : null;
                 newRealm = new RelayRealm(parentRealm, targetRealmId);

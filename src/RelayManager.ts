@@ -1,6 +1,7 @@
 import { connection } from "websocket";
 import RelayRealm from "./RelayRealm";
 import RelayUser from "./RelayUser";
+import EntityManager from "./EntityManager";
 
 export default class RelayManager {
 
@@ -14,8 +15,11 @@ export default class RelayManager {
 
     private nextRealmId: number = 0;
 
+    private entityManager: EntityManager = null;
+
     public constructor(public readonly config: IConfig) {
         this.nextRealmId = config.publicRealmCount;
+        this.entityManager = new EntityManager(config.entityPath);
     }
 
     public registerUser(connection: connection): number {
@@ -81,6 +85,34 @@ export default class RelayManager {
                     this.handleSendToUserCommand(user, targetUser, message);
                 }
                 break;
+
+            case ':':
+                let targetRealmId = parseInt(command.substring(1));
+                let targetRealm = this.realms[targetRealmId];
+                if (targetRealm) {
+                    this.handleSendToRealmCommand(user, targetRealm, message);
+                }
+                break;
+
+            case '<':
+                let loadDataFragment = command.substring(1);
+                if (loadDataFragment.length > 0) {
+                    let loadDataCommaIndex = loadDataFragment?.indexOf(',') ?? -1;
+                    let loadDataRealmId = loadDataCommaIndex === -1 ? -1 : parseInt(loadDataFragment.substring(0, loadDataCommaIndex));
+                    let loadDataEntityName = loadDataCommaIndex === -1 ? loadDataFragment : loadDataFragment.substring(loadDataCommaIndex + 1);
+                    this.handleLoadDataCommand(user, loadDataRealmId, loadDataEntityName);
+                }
+                break;
+
+            case '>':
+                let saveDataFragment = command.substring(1);
+                if (saveDataFragment.length > 0) {
+                    let saveDataCommaIndex = saveDataFragment?.indexOf(',') ?? -1;
+                    let saveDataEntityName = saveDataCommaIndex === -1 ? saveDataFragment : saveDataFragment.substring(0, saveDataCommaIndex);
+                    let saveDataExpireTime = saveDataCommaIndex === -1 ? -1 : parseInt(saveDataFragment.substring(saveDataCommaIndex + 1));
+                    this.handleSaveDataCommand(user, saveDataEntityName, saveDataExpireTime, message);
+                }
+                break;
         }
     }
 
@@ -123,6 +155,37 @@ export default class RelayManager {
             return;
         }
         this.send(targetUser, `@${senderUser.id} ${message}`);
+    }
+
+    private handleSendToRealmCommand(senderUser: RelayUser, targetRealm: RelayRealm, message: string): void {
+        if (senderUser.realm === null || targetRealm.users.length === 0) {
+            return;
+        }
+        let targetUser = targetRealm.users[0];
+        this.send(targetUser, `@${senderUser.id} ${message}`);
+    }
+
+    private handleLoadDataCommand(senderUser: RelayUser, realmId: number, entityName: string): void {
+        if (senderUser.realm === null) {
+            return;
+        }
+        if (realmId === -1) {
+            realmId = senderUser.realm.id;
+        }
+        let fragment = realmId === senderUser.realm.id ? entityName : realmId + ',' + entityName;
+        let data = this.entityManager.loadData(realmId, entityName);
+        if (data === '') {
+            this.send(senderUser, `<${fragment}`);
+        } else {
+            this.send(senderUser, `<${fragment} ${data}`);
+        }
+    }
+
+    private handleSaveDataCommand(senderUser: RelayUser, entityName: string, expires: number, data: string): void {
+        if (senderUser.realm === null) {
+            return;
+        }
+        this.entityManager.saveData(senderUser.realm.id, entityName, expires, data);
     }
 
     /**
@@ -211,10 +274,7 @@ export default class RelayManager {
 
             // Remove realm data
             if (currentRealm.id >= this.config.publicRealmCount) {
-                // TODO: Implement
-                //for (let fileName of Directory.GetFiles(".", "realm." + currentRealm.id + ".*.entity")) {
-                //File.Delete(fileName);
-                //}
+                this.entityManager.deleteData(currentRealm.id);
             }
 
             // Remove the realm from the list

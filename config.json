@@ -6,5 +6,6 @@
     "acceptedProtocols": [
         "*"
     ],
-    "publicRealmCount": 65536
+    "publicRealmCount": 65536,
+    "entityPath": "./data"
 }

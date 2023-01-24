@@ -7,5 +7,7 @@
         "*"
     ],
     "publicRealmCount": 65536,
-    "entityPath": "./data"
+    "entityPath": "./data",
+    "logIncoming": false,
+    "logOutgoing": false
 }

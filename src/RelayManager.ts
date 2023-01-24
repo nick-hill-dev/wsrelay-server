@@ -50,7 +50,9 @@ export default class RelayManager {
         }
 
         let realmId = user.realm ? user.realm.id : -1;
-        console.log(`[${userId}:${realmId === -1 ? '?' : realmId}|Message|In] ${packet}`);
+        if (this.config.logIncoming) {
+            console.log(`[${userId}:${realmId === -1 ? '?' : realmId}|Message|In] ${packet}`);
+        }
 
         let spaceIndex = packet.indexOf(' ');
         let command = spaceIndex === -1 ? packet : packet.substring(0, spaceIndex);
@@ -289,7 +291,9 @@ export default class RelayManager {
     }
 
     private send(user: RelayUser, packet: string) {
-        console.log(`[${user.id}|Out] ${packet}`);
+        if (this.config.logOutgoing) {
+            console.log(`[${user.id}|Out] ${packet}`);
+        }
         user.connection.sendUTF(packet);
     }
 

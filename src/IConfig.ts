@@ -10,4 +10,8 @@ interface IConfig {
 
     entityPath: string;
 
+    logIncoming: boolean;
+
+    logOutgoing: boolean;
+
 }

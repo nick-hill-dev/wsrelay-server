@@ -109,7 +109,7 @@ export default class RelayManager {
                 if (saveDataFragment.length > 0) {
                     let saveDataCommaIndex = saveDataFragment?.indexOf(',') ?? -1;
                     let saveDataEntityName = saveDataCommaIndex === -1 ? saveDataFragment : saveDataFragment.substring(0, saveDataCommaIndex);
-                    let saveDataExpireTime = saveDataCommaIndex === -1 ? -1 : parseInt(saveDataFragment.substring(saveDataCommaIndex + 1));
+                    let saveDataExpireTime = saveDataCommaIndex === -1 ? 0 : parseInt(saveDataFragment.substring(saveDataCommaIndex + 1));
                     this.handleSaveDataCommand(user, saveDataEntityName, saveDataExpireTime, message);
                 }
                 break;
@@ -181,11 +181,11 @@ export default class RelayManager {
         }
     }
 
-    private handleSaveDataCommand(senderUser: RelayUser, entityName: string, expires: number, data: string): void {
+    private handleSaveDataCommand(senderUser: RelayUser, entityName: string, time: number, data: string): void {
         if (senderUser.realm === null) {
             return;
         }
-        this.entityManager.saveData(senderUser.realm.id, entityName, expires, data);
+        this.entityManager.saveData(senderUser.realm.id, entityName, time, data);
     }
 
     /**

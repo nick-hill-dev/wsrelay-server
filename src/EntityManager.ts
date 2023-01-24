@@ -37,15 +37,17 @@ export default class EntityManager {
                 fs.unlinkSync(fileName);
             }
         } else {
-            let date = new Date();
-            date.setSeconds(date.getSeconds() + time);
-            let metadata = time == 0 ? 0 : this.getTicks(date);
+            let metadata = 0;
+            if (time !== 0) {
+                let date = new Date();
+                date.setSeconds(date.getSeconds() + time);
+                metadata = this.getTicks(date);
+            }
             fs.writeFileSync(fileName, metadata + " " + message);
         }
     }
 
     public deleteData(realmId: number) {
-        console.log('XXX');
         for (let fileName of fs.readdirSync(this.path)) {
             if (fileName.startsWith(`realm.${realmId}.`)) {
                 fs.unlinkSync(`${this.path}/${fileName}`);

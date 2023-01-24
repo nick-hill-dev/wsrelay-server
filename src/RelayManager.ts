@@ -71,6 +71,7 @@ export default class RelayManager {
             case '&':
                 let realmNumberChild = parseInt(command.substring(1));
                 this.handleJoinRealmChildCommand(user, isNaN(realmNumberChild) ? -1 : realmNumberChild);
+                break;
 
             case '*':
                 this.handleSendToAllCommand(user, message);

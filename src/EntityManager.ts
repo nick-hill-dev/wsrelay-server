@@ -12,7 +12,7 @@ export default class EntityManager {
         }
         let fileName = this.getFullFileName(realmId, entityName);
         if (!fs.existsSync(fileName)) {
-            return 'Does not exist: ' + fileName;
+            return '';
         }
 
         let allData = fs.readFileSync(fileName, 'utf8');

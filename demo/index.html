@@ -36,7 +36,7 @@
         }
 
         function connect() {
-            let address = 'ws://localhost:22002';
+            let address = document.getElementById('addressTextBox').value;
             let protocol = 'relay';
             log(`Connecting to ${address}, protocol ${protocol}`);
             client = new WebSocket(address, protocol);
@@ -63,6 +63,7 @@
             client.close();
         }
     </script>
+    <input type="text" id="addressTextBox" value="ws://localhost:22002" />
     <button id="connectButton" onclick="connect()">Connect</button>
     <button id="disconnectButton" disabled="disabled" onclick="disconnect()">Disconnect</button>
 </body>

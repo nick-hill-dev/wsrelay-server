@@ -1,0 +1,51 @@
+stages:
+
+  - name: build-and-publish
+    jobs:
+
+      - name: build-and-publish
+        steps:
+
+          - name: typescript-build
+            type: CommandLine@0
+            parameters:
+              script: tsc -b
+          
+          - name: docker-build
+            type: CommandLine@0
+            parameters:
+              script: docker build -t wsrelay:latest . --platform linux/arm64/v8
+
+          - name: docker-login
+            type: CommandLine@0
+            parameters:
+              script: docker login containers
+
+          - name: docker-tag
+            type: CommandLine@0
+            parameters:
+              script: docker tag wsrelay:latest containers:443/wsrelay:latest
+
+          - name: docker-push
+            type: CommandLine@0
+            parameters:
+              script: docker push containers:443/wsrelay:latest
+
+  - name: deploy
+    jobs:
+
+      - name: deploy-production
+        steps:
+
+          - name: docker-pull
+            type: CommandLine@0
+            parameters:
+              script: docker -H containers pull containers:443/wsrelay:latest
+
+          - name: docker-replace
+            type: CommandLine@0
+            parameters:
+              script:
+                - docker -H containers stop wsrelay
+                - docker -H containers rm wsrelay
+                - docker -H containers run -d -p 22002:22002 --restart=always --name wsrelay containers:443/wsrelay:latest

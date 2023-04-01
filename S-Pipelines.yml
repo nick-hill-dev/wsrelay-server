@@ -6,11 +6,16 @@ stages:
       - name: build-and-publish
         steps:
 
-          - name: typescript-build
+          - name: npm-install
             type: AgnosticShellScript@0
             parameters:
               script:
                 - npm install
+
+          - name: typescript-build
+            type: AgnosticShellScript@0
+            parameters:
+              script:
                 - tsc -b
           
           - name: docker-build

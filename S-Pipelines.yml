@@ -7,29 +7,34 @@ stages:
         steps:
 
           - name: typescript-build
-            type: CommandLine@0
+            type: AgnosticShellScript@0
             parameters:
-              script: tsc -b
+              script:
+                - tsc -b
           
           - name: docker-build
-            type: CommandLine@0
+            type: AgnosticShellScript@0
             parameters:
-              script: docker build -t wsrelay:latest . --platform linux/arm64/v8
+              script:
+                - docker build -t wsrelay:latest . --platform linux/arm64/v8
 
           - name: docker-login
-            type: CommandLine@0
+            type: AgnosticShellScript@0
             parameters:
-              script: docker login containers
+              script:
+                - docker login containers
 
           - name: docker-tag
-            type: CommandLine@0
+            type: AgnosticShellScript@0
             parameters:
-              script: docker tag wsrelay:latest containers:443/wsrelay:latest
+              script:
+                - docker tag wsrelay:latest containers:443/wsrelay:latest
 
           - name: docker-push
-            type: CommandLine@0
+            type: AgnosticShellScript@0
             parameters:
-              script: docker push containers:443/wsrelay:latest
+              script:
+                - docker push containers:443/wsrelay:latest
 
   - name: deploy
     jobs:
@@ -38,12 +43,13 @@ stages:
         steps:
 
           - name: docker-pull
-            type: CommandLine@0
+            type: AgnosticShellScript@0
             parameters:
-              script: docker -H containers pull containers:443/wsrelay:latest
+              script:
+                - docker -H containers pull containers:443/wsrelay:latest
 
           - name: docker-replace
-            type: CommandLine@0
+            type: AgnosticShellScript@0
             parameters:
               script:
                 - docker -H containers stop wsrelay

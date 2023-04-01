@@ -10,6 +10,7 @@ stages:
             type: AgnosticShellScript@0
             parameters:
               script:
+                - npm install
                 - tsc -b
           
           - name: docker-build

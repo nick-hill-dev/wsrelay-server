@@ -11,6 +11,10 @@ const fs = require('fs');
 let configText = fs.readFileSync('config.json');
 let config = <IConfig>JSON.parse(configText);
 
+if (!fs.existsSync(config.entityPath)) {
+    fs.mkdirSync(config.entityPath);
+}
+
 let manager = new RelayManager(config);
 
 let server = http.createServer((request: any, response: any) => {

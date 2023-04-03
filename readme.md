@@ -1,269 +1,86 @@
-# Quick Start
+# WebSocket Relay Server
 
-## Prepare Development Environment
+The WebSocket Relay server is a node-based websocket communications server enabling users across different web browsers and machines to communicate with each other, often for the purpose of collaboration. For example, WSRelay enables online chat or multiplayer gaming between groups of people without the machines needing to have knowledge of each other directly. Users can simply load a web page and are connected to each other.
 
-`npm install`
+Web pages that make use of a WebSocket Relay server must understand and transmit messages using the WebSocket Relay protocol. The WebSocket Relay protocol is described in detail in the [PROTOCOL.md](PROTOCOL.md) file. The [WebSocket Relay Client library](https://github.com/nick-hill-dev/wsrelay-client) can be used to simplify communications to and from a WebSocket Relay server in your client applications.
 
-## Run with TypeScript
+## Quick Start
 
-`npx ts-node src/app.ts`
+1. Prepare Development Environment: `npm install`
+1. Run with `npx` and TypeScript: `npx ts-node src/app.ts`
 
-# WebSocket Relay Protocol
+Alternatively, instead of using `npx` and `ts-node` you can build via TypeScript and run directly:
 
-A WebSocket Relay server implements the WebSocket Relay protocol and allows communication between web browsers on different machines using WebSockets.
+```bash
+tsc -b
+node bin/app.js
+```
 
-Communications are split into different channels, which are termed "realms".
+Or, build a Docker container:
 
-A user can only be present in one realm at a time although some degree of cross-realm communication is possible.
+```bash
+tsc -b
+docker build -t wsrelay:latest . # For Raspberry Pi add this parameter: --platform linux/arm64/v8
+docker run wsrelay:latest # If you want to run it now
+```
 
-All packets sent to and received from the WebSocket Relay server consist of one or two fragments, seperated by a space character. In splitting a packet, only the first space character is used. Subsequent space characters are included in the second fragment.
+## Features
 
-For example: `#3` is a single-fragment packet and `@1 Hello World` is a two-fragment packet consisting of `@1` for the first fragment and `Hello World` for the second.
+- Allows web browsers on different machines to communicate with one another via the relay.
+- Groups of people can be segregated into different groups, aka "realms".
+- Can send messages to everyone in a realm, everyone in a realm except yourself, or to specific people currently residing within a realm.
+- Receive notifications when people join or leave a realm.
+- Receive notifications when child realms begin to exist or are deleted.
+- Distinction between permanent realms and temporary realms.
+- Can create or join child realms belonging to a parent realm, in a tree-like structure.
+- Can save data to realms and load data from them.
+- Support for communication across different realms.
+- Can implement custom protocols on top of the basic WebSocket Relay protocol for highly customised applications.
+- Can specify which specific origins to accept, or all.
+- Can specify which specific websocket protocols to accept, or all.
+- Can operate as a Docker container.
+- Can run on a Raspberry Pi, as a Docker container or as a node application.
 
-## Packets that the server sends to web browsers
+## Configuration
 
-The messages you can receive from the WebSocket Relay server.
+The service is configured via config.json as follows:
 
-### #x - Assign user number
+```json
+{
+    "port": 22002, // The port number to listen on for incoming connections.
+    "acceptedOrigins": [ // A list of strings describing which origins will be accepted.
+        "http://127.0.0.1" // Another example: "https://my.website.com".
+    ],
+    "acceptedProtocols": [ // A list of strings describing which protocols will be accepted.
+        "*" // This accepts all protocols.
+    ],
+    "publicRealmCount": 65536, // The number of reserved realms, where data is not deleted, and temporary realm IDs are above this number.
+    "entityPath": "./data", // The location of where to store data that clients have asked to save on the server, I.E. game state etc.
+    "logIncoming": false, // Indicates whether or not to write messages to the console based on what messages the server has received.
+    "logOutgoing": false // Indicates whether or not to write messages to the console based on what messages the server has sent.
+}
+```
 
-Each user who connects to the WebSocket Relay server is assigned a unique user number at the time of joining.
+## Example Usage
 
-Format: `#x`
+See [demo/index.html](demo/index.html) for an example on directly calling the server, without support of the [WebSocket Relay Client library](https://github.com/nick-hill-dev/wsrelay-client). Use cases like this require comprehensive understanding of the [protocol](PROTOCOL.md).
 
-Parameter x: The user number assigned to the receiver of this message. Unique across the server.
+## Secure WebSocket
 
-Example: `#3` - You are assigned to be user number 3.
+There is no direct support for the wss:// protocol at present but it is possible to set up a proxy to transform wss traffic into ws traffic. Example below describes what changes need to be made to an existing SSL host in the apache2 configuration file:
 
-### ^x - Assign realm number
+```xml
+<VirtualHost *:443>
+    ...
+    ProxyPass "/wsrelay" "ws://example.com:12345/wsrelay"
+    ...
+</VirtualHost>
+```
 
-A notification to the receiver specifying which realm they are now a member of.
+## C# Version (2019)
 
-Format: `^x`
+The original version of WebSocket Relay server was created many years ago and originally published as a part of the "Social Poker" solution [released in 2019](https://github.com/nick-hill-dev/social-poker) (under the `Application Server/WSRelay/(mono)` folder). This repository is a complete rewrite of that C# version in order to improve stability and make it simpler to use and configure. This version of the WebSocket Relay server retains 100% compatibility with the original.
 
-Parameter x: The realm number you have been assigned to.
+## License
 
-Example: `^9`
-
-### &x - Assign child realm number
-
-Format: `&x`
-
-Parameter x: The realm number you have been assigned to, which is a child realm of the realm you used to be in.
-
-Example: `&9`
-
-### = - Users present
-
-Sent to users who join a realm to give them a list of users present in the realm at the time of joining.
-
-Format: `=u`
-
-Parameter u: A comma seperated list of user numbers, indicating the number of users present in the realm and what user numbers they have.
-
-Example: `=1,2,3`
-
-### + - User joined
-
-A notification that a user has joined the realm.
-
-Format: `+x`
-
-Parameter x: The user number who has joined the realm.
-
-Example: `+3`
-
-### - - User left
-
-A notification that a user has left the realm.
-
-Format: `-x`
-
-Parameter x: The user number who has left the realm.
-
-Example: `-3`
-
-### { - Child realm created
-
-Sent to members of a realm to notify them that a child realm has been created.
-
-This message is also sent to users that join the realm to notify them which child realms are present at the time of joining.
-
-Format: `{x`
-
-Parameter x: The number of the new child realm that has been created.
-
-Example: `{4`
-
-### } - Child realm destroyed
-
-Sent to members of a realm to notify them that one of the child realms belonging to that realm has been destroyed.
-
-Format: `}x`
-
-Parameter x: The number of the child realm that has been destroyed.
-
-Example: `}4`
-
-### @ - Message sent to me
-
-The sender of this message requested that the message be sent to you only. The message was not sent to anyone else.
-
-Format: `@x m`
-
-Parameter x: The number of the user who sent the message.
-
-Parameter m: The rest of the packet. The message that was sent.
-
-Example: `@3 Hello you!`
-
-### ! - Message sent to everyone except sender
-
-The sender of this message requested that the message be sent to everyone in the realm, and not echoed back to the sender.
-
-Format: `!x m`
-
-Parameter x: The number of the user who sent the message.
-
-Parameter m: The rest of the packet. The message that was sent.
-
-Example: `!3 Hello realm!`
-
-### * - Message sent to all including to sender
-
-The sender of this message requested that the message be sent to everyone, including the user who sent the message.
-
-Format: `*x m`
-
-Parameter x: The number of the user who sent the message.
-
-Parameter m: The rest of the packet. The message that was sent.
-
-Example: `*3 Hello everyone including me!`
-
-### < - Realm data
-
-A response to a request to retrieve data about a realm.
-
-Format: `<e d` or `<r,e d`
-
-Parameter r: The realm number the data is associated with, in the case that the sender's reealm is different to the realm the data has been assigned to.
-
-Parameter e: The key, effectively the file name of the data.
-
-Parameter d: The rest of the packet. The data.
-
-Example: `<chips 10000`
-
-Example: `<12,cards 12 32 7`
-
-## Packets that web browsers can send to the server
-
-The commands you can send to the WebSocket Relay server.
-
-### ^x - Join realm number x
-
-Used to change the user's realm.
-
-Format: `^` or `^x`
-
-Parameter x: The realm number to join. If omitted, creates a new realm.
-
-Example: `^`
-
-Example: `^5`
-
-### &x - Join child realm number x
-
-Used to change the user's realm. The target realm is a child realm of the user's current realm.
-
-Users must be present in a realm in order to be able to join a child realm.
-
-Format: `&` or `&x`
-
-Parameter x: The child realm number to join. If omitted, creates a new child realm.
-
-Example: `&`
-
-Example: `&5`
-
-### @x s - Send string s to user x
-
-Send a message directly to a specific user.
-
-Format: `@x s`
-
-Parameter x: The user number of the user who should be sent the message.
-
-Parameter s: The message to send to the user.
-
-Example: `@4 Hello friend!`
-
-### ! s - Send string s to all users except for me
-
-Send a message to everyone in the current realm except for the person who sent the message.
-
-Format: `! s`
-
-Parameter s: The message to send.
-
-Example: `! Hello everyone else!`
-
-### * s - Send string s to all users including me
-
-Send a message to everyone in the current realm including the person who sent the message.
-
-Format: `* s`
-
-Parameter s: The message to send.
-
-Example: `* Hello everyone including me!`
-
-### :x s - Send string s to all users in realm x
-
-Send a message to every person in the specified realm.
-
-Format: `:x s`
-
-Parameter x: The number of the realm to send the message to.
-
-Example: `:3 Hello realm 3!`
-
-### >k s - Save realm data s using key k
-
-Save key-value data on the server, associated with the user's current realm.
-
-Format: `>k,t s` or `>k s` or `>k`
-
-Parameter k: The key of the data. Effectively the file name for the data.
-
-Parameter t: The amount of time, in seconds, to store the data on the server. If omitted, then the data is stored permanently.
-
-Parameter s: The data to save. If not specified, then any existing data will be deleted.
-
-Example: `>score 10000`
-
-Example: `>score`
-
-### <k - Retrieve realm data k
-
-Retrieve key-value data that was previously saved on the server.
-
-Format: `<k` or `<r,k`
-
-Parameter r: The realm number containing the data. If omitted, uses the user's current realm.
-
-Parameter k: The key of the data. Effectively the file name for the data to retrieve.
-
-Example: `<score`
-
-Example: `<4,score`
-
-### $c - Execute command
-
-Instructs the server to execute a command.
-
-Format: `$c`
-
-Parameter c: The command the server should execute, including parameters.
-
-Example: `$setEmptyRealmLifetime 90`
+The WebSocket Relay server was written by Nick Hill and is released under the MIT license. See LICENSE for more information.

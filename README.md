@@ -45,7 +45,7 @@ docker run wsrelay:latest # If you want to run it now
 
 The service is configured via config.json as follows:
 
-```json
+```jsonc
 {
     "port": 22002, // The port number to listen on for incoming connections.
     "acceptedOrigins": [ // A list of strings describing which origins will be accepted.

@@ -1,7 +1,7 @@
 {
     "port": 22002,
     "acceptedOrigins": [
-        "http://127.0.0.1"
+        "*"
     ],
     "acceptedProtocols": [
         "*"

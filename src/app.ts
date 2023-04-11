@@ -29,6 +29,10 @@ server.listen(config.port, () => {
     console.log('Connections will be accepted for the following protocols: ' + config.acceptedProtocols.join(', '));
     console.log(`Listening on port ${config.port}.`);
     console.log();
+    if (config.acceptedOrigins.indexOf('*') !== -1) {
+        console.warn('WARNING: Server accepts all origins. This is a security risk!');
+        console.log();
+    }
 });
 
 let wsServer: WSServer = new WebSocketServer({
@@ -38,13 +42,27 @@ let wsServer: WSServer = new WebSocketServer({
 
 wsServer.on('request', (request) => {
 
-    // Confirm the origin is permitted
-    let url = new URL(request.origin);
-    let checkAddress = `${url.protocol}//${url.hostname}`;
-    if (config.acceptedOrigins.indexOf(checkAddress) === -1) {
-        request.reject();
-        console.log(`[Connect] Rejected connection from non-permitted origin: ${checkAddress}`);
-        return;
+    let checkAddress = '?';
+    if (config.acceptedOrigins.indexOf('*') === -1) {
+
+        // Confirm origin is valid
+        let url: URL = null;
+        try {
+            url = new URL(request.origin);
+        } catch {
+            request.reject();
+            console.log(`[Connect] Rejected connection due to invalid origin URL: ${request.origin}`);
+            return;
+        }
+
+        // Confirm the origin is permitted
+        checkAddress = `${url.protocol}//${url.hostname}`;
+        if (config.acceptedOrigins.indexOf(checkAddress) === -1) {
+            request.reject();
+            console.log(`[Connect] Rejected connection from non-permitted origin: ${checkAddress}`);
+            return;
+        }
+
     }
 
     // At least one protocol must be specified

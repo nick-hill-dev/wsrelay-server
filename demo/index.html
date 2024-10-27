@@ -9,16 +9,19 @@
 
 <body>
     <style>
-        p,
         button {
-            font-family: Consolas;
-            font-size: 12t;
+            height: 20pt;
+        }
+
+        #messagesDiv {
             color: blue;
+            font-family: Consolas;
+            font-size: 12pt;
             line-height: 0;
         }
 
-        button {
-            height: 20pt;
+        #connectedDiv {
+            display: none;
         }
     </style>
     <script>
@@ -27,12 +30,25 @@
         function log(text) {
             let p = document.createElement('p');
             p.textContent = text;
-            document.body.appendChild(p);
+            document.getElementById('messagesDiv').appendChild(p);
         }
 
-        function send(client, command) {
+        function sendInternal(command) {
             log(`Out: ${command}`);
             client.send(command);
+        }
+
+        function sendUtf8() {
+            const text = document.getElementById('dataToSendInput').value;
+            sendInternal(text);
+        }
+
+        function sendBinary() {
+            const input = document.getElementById('dataToSendInput').value;
+            log(`Out (binary): ${input}`);
+            const byteArray = input.split(',').map(num => parseInt(num.trim(), 10));
+            const binaryData = new Uint8Array(byteArray);
+            client.send(binaryData);
         }
 
         function connect() {
@@ -41,10 +57,10 @@
             log(`Connecting to ${address}, protocol ${protocol}`);
             client = new WebSocket(address, protocol);
             client.onopen = () => {
-                send(client, '^19');
-                send(client, '* Hello World!');
+                sendInternal('^19');
                 document.getElementById('connectButton').disabled = true;
                 document.getElementById('disconnectButton').disabled = false;
+                document.getElementById('connectedDiv').style.display = 'inline';
             };
             client.onerror = ev => {
                 log(`WebSocket error.`);
@@ -53,6 +69,7 @@
                 log(`WebSocket closed: ${ev.code}`);
                 document.getElementById('connectButton').disabled = false;
                 document.getElementById('disconnectButton').disabled = true;
+                document.getElementById('connectedDiv').style.display = 'none';
             };
             client.onmessage = ev => {
                 log(`In: ${ev.data}`);
@@ -66,6 +83,14 @@
     <input type="text" id="addressTextBox" value="ws://localhost:22002" />
     <button id="connectButton" onclick="connect()">Connect</button>
     <button id="disconnectButton" disabled="disabled" onclick="disconnect()">Disconnect</button>
+    <div id="messagesDiv">
+    </div>
+    <div id="connectedDiv">
+        <input type="text" id="dataToSendInput" value="* Hello World!" />
+        <button id="sendUtf8Button" onclick="sendUtf8()">Send UTF8</button>
+        <button id="sendBinaryButton" onclick="sendBinary()">Send Binary</button>
+        <p>(When sending binary please specify bytes seperated by commas I.E. 1, 2, 3 etc)</p>
+    </div>
 </body>
 
 </html>

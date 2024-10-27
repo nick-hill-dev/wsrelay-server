@@ -1,11 +1,11 @@
 'use strict';
 
-let WebSocketServer = require('websocket').server;
-import { connection, server as WSServer } from 'websocket';
-let http = require('http');
-
 import './IConfig';
 import RelayManager from './RelayManager';
+import { connection, request, server as WSServer } from 'websocket';
+
+let WebSocketServer = require('websocket').server;
+let http = require('http');
 
 const fs = require('fs');
 let configText = fs.readFileSync('config.json');
@@ -42,43 +42,10 @@ let wsServer: WSServer = new WebSocketServer({
 
 wsServer.on('request', (request) => {
 
-    let checkAddress = '?';
-    if (config.acceptedOrigins.indexOf('*') === -1) {
-
-        // Confirm origin is valid
-        let url: URL = null;
-        try {
-            url = new URL(request.origin);
-        } catch {
-            request.reject();
-            console.log(`[Connect] Rejected connection due to invalid origin URL: ${request.origin}`);
-            return;
-        }
-
-        // Confirm the origin is permitted
-        checkAddress = `${url.protocol}//${url.hostname}`;
-        if (config.acceptedOrigins.indexOf(checkAddress) === -1) {
-            request.reject();
-            console.log(`[Connect] Rejected connection from non-permitted origin: ${checkAddress}`);
-            return;
-        }
-
-    }
-
-    // At least one protocol must be specified
-    if (request.requestedProtocols.length === 0) {
+    // Check the connection request fits the security criteria defined in the config file
+    if (!checkRequest(request)) {
         request.reject();
-        console.log(`[Connect] Rejected connection due to not asking for any protocols: ${checkAddress}`);
         return;
-    }
-
-    // Confirm all the requested protocols are permitted
-    for (let requestedProcotol of request.requestedProtocols) {
-        if (config.acceptedProtocols.indexOf('*') === -1 && config.acceptedProtocols.indexOf(requestedProcotol) === -1) {
-            request.reject();
-            console.log(`[Connect] Rejected connection from non-permitted protocol: ${checkAddress}`);
-            return;
-        }
     }
 
     // Accept the connection
@@ -107,9 +74,9 @@ wsServer.on('request', (request) => {
     connection.on('message', message => {
         try {
             if (message.type === 'utf8') {
-                manager.handleMessage(userId, message.utf8Data);
+                manager.handleUtf8Message(userId, message.utf8Data);
             } else if (message.type === 'binary') {
-                console.log(`[${userId}|Binary|In] (${message.binaryData.length} bytes.`);
+                console.log(`[${userId}|Binary|In] (${message.binaryData.length} bytes)`);
             }
         } catch (e) {
             console.error(`[Error] {Handling Message} ${e}`);
@@ -127,3 +94,43 @@ wsServer.on('request', (request) => {
     });
 
 });
+
+function checkRequest(request: request): boolean {
+
+    let checkAddress = '?';
+    if (config.acceptedOrigins.indexOf('*') === -1) {
+
+        // Confirm origin is valid
+        let url: URL = null;
+        try {
+            url = new URL(request.origin);
+        } catch {
+            console.log(`[Connect] Rejected connection due to invalid origin URL: ${request.origin}`);
+            return false;
+        }
+
+        // Confirm the origin is permitted
+        checkAddress = `${url.protocol}//${url.hostname}`;
+        if (config.acceptedOrigins.indexOf(checkAddress) === -1) {
+            console.log(`[Connect] Rejected connection from non-permitted origin: ${checkAddress}`);
+            return false;
+        }
+
+    }
+
+    // At least one protocol must be specified
+    if (request.requestedProtocols.length === 0) {
+        console.log(`[Connect] Rejected connection due to not asking for any protocols: ${checkAddress}`);
+        return false;
+    }
+
+    // Confirm all the requested protocols are permitted
+    for (let requestedProcotol of request.requestedProtocols) {
+        if (config.acceptedProtocols.indexOf('*') === -1 && config.acceptedProtocols.indexOf(requestedProcotol) === -1) {
+            console.log(`[Connect] Rejected connection from non-permitted protocol: ${checkAddress}`);
+            return false;
+        }
+    }
+
+    return true;
+}

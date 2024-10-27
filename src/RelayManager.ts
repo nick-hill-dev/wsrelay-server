@@ -15,7 +15,7 @@ export default class RelayManager {
 
     private nextRealmId: number = 0;
 
-    private entityManager: EntityManager = null;
+    private readonly entityManager: EntityManager = null;
 
     public constructor(public readonly config: IConfig) {
         this.nextRealmId = config.publicRealmCount;
@@ -43,7 +43,7 @@ export default class RelayManager {
         this.users[userId] = undefined;
     }
 
-    public handleMessage(userId: number, packet: string): void {
+    public handleUtf8Message(userId: number, packet: string): void {
         let user = this.users[userId];
         if (!user) {
             return;

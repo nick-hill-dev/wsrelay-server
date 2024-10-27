@@ -9,6 +9,12 @@ export class BinaryPacketReader {
         return this.buffer[this.position++];
     }
 
+    public readUint32(): number {
+        const result = this.buffer.readUInt32BE(this.position);
+        this.position += 4;
+        return result;
+    }
+
     public readString(): string {
         return this.readBuffer().toString('utf8');
     }

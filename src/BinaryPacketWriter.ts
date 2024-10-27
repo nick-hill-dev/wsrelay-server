@@ -6,6 +6,17 @@ export class BinaryPacketWriter {
         this.bytes.push(data);
     }
 
+    public writeUint32(data: number): void {
+        if (data < 0 || data > 0xFFFFFFFF) {
+            throw new Error("Number out of range for a 32-bit unsigned integer.");
+        }
+
+        this.bytes.push((data >> 24) & 0xFF);
+        this.bytes.push((data >> 16) & 0xFF);
+        this.bytes.push((data >> 8) & 0xFF);
+        this.bytes.push(data & 0xFF);
+    }
+
     public writeString(data: string): void {
         this.writeBuffer(Buffer.from(data, 'utf8'));
     }

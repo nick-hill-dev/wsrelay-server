@@ -1,10 +1,11 @@
 import { connection } from "websocket";
 import RelayRealm from "./RelayRealm";
 import RelayUser from "./RelayUser";
-import EntityManager from "./EntityManager";
+import EntityManager from "./Entities/EntityManager";
 import { binaryCommandNames, binaryCommandNumbers } from "./BinaryCommand";
 import { BinaryPacketWriter } from "./BinaryPacketWriter";
 import { BinaryPacketReader } from "./BinaryPacketReader";
+import FseManager from "./Entities/FseManager";
 
 export default class RelayManager {
 
@@ -20,9 +21,12 @@ export default class RelayManager {
 
     private readonly entityManager: EntityManager = null;
 
+    private readonly fseManager: FseManager = null;
+
     public constructor(public readonly config: IConfig) {
         this.nextRealmId = config.publicRealmCount;
         this.entityManager = new EntityManager(config.entityPath);
+        this.fseManager = new FseManager(config.entityPath);
     }
 
     public registerUser(connection: connection): number {
@@ -141,15 +145,23 @@ export default class RelayManager {
         }
 
         switch (commandName) {
-            case 'loadBinaryData':
-                const loadDataEntityName = reader.readString();
-                this.handleBinLoadDataCommand(user, realmId, loadDataEntityName);
+            case 'fseListen':
+                const fseLoadEntityName = reader.readString();
+                this.handleBinFseListenCommand(user, realmId, fseLoadEntityName);
                 break;
 
-            case 'saveBinaryData':
-                const saveDataEntityName = reader.readString();
-                const saveDataBytes = reader.readBuffer();
-                this.handleBinSaveDataCommand(user, saveDataEntityName, saveDataBytes);
+            case 'fseSet':
+                const fseSetEntityName = reader.readString();
+                const fseSetBytes = reader.readBuffer();
+                this.handleBinFseSetCommand(user, fseSetEntityName, fseSetBytes);
+                break;
+
+            case 'fseUpdate':
+            case 'fseUpdateIncludeMe':
+                const fseUpdateName = reader.readString();
+                const fseUpdateStart = reader.readUint32();
+                const fseUpdateData = reader.readBuffer();
+                this.handleBinFseUpdateCommand(user, fseUpdateName, fseUpdateStart, fseUpdateData, commandName === 'fseUpdateIncludeMe');
                 break;
         }
     }
@@ -211,7 +223,7 @@ export default class RelayManager {
             realmId = senderUser.realm.id;
         }
         let fragment = realmId === senderUser.realm.id ? entityName : realmId + ',' + entityName;
-        let data = this.entityManager.loadData(realmId, 'utf8', entityName);
+        let data = this.entityManager.loadData(realmId, entityName);
         if (data === '') {
             this.sendUtf8(senderUser, `<${fragment}`);
         } else {
@@ -223,30 +235,52 @@ export default class RelayManager {
         if (senderUser.realm === null) {
             return;
         }
-        this.entityManager.saveData(senderUser.realm.id, 'utf8', entityName, time, data);
+        this.entityManager.saveData(senderUser.realm.id, entityName, time, data);
     }
 
-    private handleBinLoadDataCommand(senderUser: RelayUser, realmId: number, entityName: string): void {
+    private handleBinFseListenCommand(senderUser: RelayUser, realmId: number, entityName: string): void {
         if (senderUser.realm === null) {
             return;
         }
         if (realmId === -1) {
             realmId = senderUser.realm.id;
         }
-        let data = this.entityManager.loadData(realmId, 'binary', entityName);
+        let data = this.fseManager.loadData(realmId, entityName);
 
         const packet = new BinaryPacketWriter();
-        packet.writeByte(binaryCommandNumbers.get('loadBinaryData'));
+        packet.writeByte(binaryCommandNumbers.get('fseListen'));
         packet.writeString(entityName);
         packet.writeBuffer(data);
         this.sendBinary(senderUser, packet.toBuffer());
     }
 
-    private handleBinSaveDataCommand(senderUser: RelayUser, entityName: string, data: Buffer): void {
+    private handleBinFseSetCommand(senderUser: RelayUser, entityName: string, data: Buffer): void {
         if (senderUser.realm === null) {
             return;
         }
-        this.entityManager.saveData(senderUser.realm.id, 'binary', entityName, 0, data);
+        this.fseManager.saveData(senderUser.realm.id, entityName, data);
+    }
+
+    private handleBinFseUpdateCommand(senderUser: RelayUser, name: string, start: number, data: Buffer, includeSender: boolean): void {
+        if (senderUser.realm === null) {
+            return;
+        }
+
+        this.fseManager.update(name, start, data);
+
+        const packet = new BinaryPacketWriter();
+        packet.writeByte(binaryCommandNumbers.get('fseUpdate'));
+        packet.writeUint32(senderUser.id);
+        packet.writeString(name);
+        packet.writeUint32(start);
+        packet.writeBuffer(data);
+        const packetAsBuffer = packet.toBuffer();
+
+        for (let realmUser of senderUser.realm.users) {
+            if (includeSender || realmUser.id !== senderUser.id) {
+                this.sendBinary(realmUser, packetAsBuffer);
+            }
+        }
     }
 
     /**
@@ -336,6 +370,7 @@ export default class RelayManager {
             // Remove realm data
             if (currentRealm.id >= this.config.publicRealmCount) {
                 this.entityManager.deleteData(currentRealm.id);
+                this.fseManager.deleteData(currentRealm.id);
             }
 
             // Remove the realm from the list

@@ -1,5 +1,3 @@
-import { EntityType } from "./EntityType";
-
 const fs = require('fs');
 
 export default class EntityManager {
@@ -8,29 +6,24 @@ export default class EntityManager {
         this.upgrade();
     }
 
-    public loadData<T extends EntityType>(realmId: number, type: T, entityName: string): T extends 'utf8' ? string : Buffer;
-    public loadData(realmId: number, type: EntityType, entityName: string): string | Buffer {
+    public loadData(realmId: number, entityName: string): string {
         if (!this.isValidEntityName(entityName)) {
             return '';
         }
-        let fileName = this.getFullFileName(realmId, type, entityName);
+        let fileName = this.getFullFileName(realmId, entityName);
         if (!fs.existsSync(fileName)) {
             return '';
         }
 
-        if (type === 'utf8') {
-            return this.loadAndProcessUtf8DataInternal(fileName);
-        } else {
-            return this.loadAndProcessBinaryDataInternal(fileName);
-        }
+        return this.loadAndProcessDataInternal(fileName);
     }
 
-    public saveData<T extends EntityType>(realmId: number, type: T, entityName: string, time: number, data: T extends 'utf8' ? string : Buffer): void;
-    public saveData(realmId: number, type: EntityType, entityName: string, time: number, data: string | Buffer): void {
+    public saveData(realmId: number, entityName: string, time: number, data: string): void {
         if (!this.isValidEntityName(entityName)) {
             return;
         }
-        const fileName = this.getFullFileName(realmId, type, entityName);
+
+        const fileName = this.getFullFileName(realmId, entityName);
         if (data.length === 0) {
             if (fs.existsSync(fileName)) {
                 fs.unlinkSync(fileName);
@@ -38,16 +31,12 @@ export default class EntityManager {
             return;
         }
 
-        if (type === 'utf8') {
-            this.saveUtf8DataInternal(fileName, time, <string>data);
-        } else {
-            this.saveBinaryDataInternal(fileName, <Buffer>data);
-        }
+        this.saveDataInternal(fileName, time, data);
     }
 
     public deleteData(realmId: number) {
         for (let fileName of fs.readdirSync(this.path)) {
-            if (fileName.startsWith(`realm.${realmId}.`)) {
+            if (fileName.startsWith(`realm.${realmId}.`) && (fileName.endsEith('.entity') || fileName.endsEith('.e'))) {
                 fs.unlinkSync(`${this.path}/${fileName}`);
             }
         }
@@ -64,7 +53,7 @@ export default class EntityManager {
         }
     }
 
-    private loadAndProcessUtf8DataInternal(fileName: string): string {
+    private loadAndProcessDataInternal(fileName: string): string {
         const allData = fs.readFileSync(fileName, 'utf8');
         const spaceIndex = allData.indexOf(' ');
 
@@ -77,17 +66,7 @@ export default class EntityManager {
         return allData.substring(spaceIndex + 1);
     }
 
-    private loadAndProcessBinaryDataInternal(fileName: string): Buffer {
-        const allData = fs.readFileSync(fileName);
-        // TODO: Implement capabilities
-        //const capabilities = allData[0];
-        //if (capabilities !== 1) {
-            //return Buffer.alloc(0);
-        //}
-        return allData.subarray(0);
-    }
-
-    private saveUtf8DataInternal(fileName: string, time: number, data: string): void {
+    private saveDataInternal(fileName: string, time: number, data: string): void {
         let metadata = 0;
         if (time !== 0) {
             let date = new Date();
@@ -97,13 +76,8 @@ export default class EntityManager {
         fs.writeFileSync(fileName, metadata + " " + data);
     }
 
-    private saveBinaryDataInternal(fileName: string, data: Buffer): void {
-        fs.writeFileSync(fileName, data);
-    }
-
-    private getFullFileName(realmId: number, type: EntityType, entityName: string): string {
-        const ext = type === 'binary' ? 'be' : 'e';
-        const fileName = `realm.${realmId}.${entityName}.${ext}`;
+    private getFullFileName(realmId: number, entityName: string): string {
+        const fileName = `realm.${realmId}.${entityName}.e`;
         return `${this.path}/${fileName}`;
     }
 

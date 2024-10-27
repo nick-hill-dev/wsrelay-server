@@ -2,10 +2,11 @@ import { connection } from "websocket";
 import RelayRealm from "./RelayRealm";
 import RelayUser from "./RelayUser";
 import EntityManager from "./Entities/EntityManager";
-import { binaryCommandNames, binaryCommandNumbers } from "./BinaryCommand";
 import { BinaryPacketWriter } from "./BinaryPacketWriter";
 import { BinaryPacketReader } from "./BinaryPacketReader";
 import FseManager from "./Entities/FseManager";
+import { binaryServerCommandNames } from "./BinaryCommandServer";
+import { binaryClientCommandNames, binaryClientCommandNumbers } from "./BinaryCommandClient";
 
 export default class RelayManager {
 
@@ -139,21 +140,27 @@ export default class RelayManager {
         const realmId = user.realm ? user.realm.id : -1;
         const reader = new BinaryPacketReader(packet);
         const command = reader.readByte();
-        const commandName = binaryCommandNames.get(command) ?? command;
+        const commandName = binaryServerCommandNames.get(command) ?? command;
         if (this.config.logIncoming) {
             console.log(`[${userId}:${realmId === -1 ? '?' : realmId}|Binary|In] ${commandName} (${packet.length - 1} bytes)`);
         }
 
         switch (commandName) {
             case 'fseListen':
-                const fseLoadEntityName = reader.readString();
-                this.handleBinFseListenCommand(user, realmId, fseLoadEntityName);
+                const fseListenEntityName = reader.readString();
+                this.handleBinFseListenCommand(user, fseListenEntityName);
+                break;
+
+            case 'fseUnlisten':
+                const fseUnlistenEntityName = reader.readString();
+                this.handleBinFseUnlistenCommand(user, fseListenEntityName);
                 break;
 
             case 'fseSet':
+            case 'fseSetIncludeMe':
                 const fseSetEntityName = reader.readString();
                 const fseSetBytes = reader.readBuffer();
-                this.handleBinFseSetCommand(user, fseSetEntityName, fseSetBytes);
+                this.handleBinFseSetCommand(user, fseSetEntityName, fseSetBytes, commandName === 'fseSetIncludeMe');
                 break;
 
             case 'fseUpdate':
@@ -238,19 +245,14 @@ export default class RelayManager {
         this.entityManager.saveData(senderUser.realm.id, entityName, time, data);
     }
 
-    // TODO: Need a "FSE Unlisten" command
-
-    private handleBinFseListenCommand(senderUser: RelayUser, realmId: number, entityName: string): void {
+    private handleBinFseListenCommand(senderUser: RelayUser, entityName: string): void {
         if (senderUser.realm === null) {
             return;
         }
-        if (realmId === -1) {
-            realmId = senderUser.realm.id;
-        }
-        let data = this.fseManager.loadData(realmId, entityName);
+        let data = this.fseManager.loadData(senderUser.realm.id, entityName);
 
         const packet = new BinaryPacketWriter();
-        packet.writeByte(binaryCommandNumbers.get('fseListen'));
+        packet.writeByte(binaryClientCommandNumbers.get('fseData'));
         packet.writeString(entityName);
         packet.writeBuffer(data);
         this.sendBinary(senderUser, packet.toBuffer());
@@ -258,7 +260,17 @@ export default class RelayManager {
         // TODO: All future updates to the file need to be sent to this user
     }
 
-    private handleBinFseSetCommand(senderUser: RelayUser, entityName: string, data: Buffer): void {
+    private handleBinFseUnlistenCommand(senderUser: RelayUser, entityName: string): void {
+        if (senderUser.realm === null) {
+            return;
+        }
+
+        // TODO: This needs to be implemented
+
+        // TODO: On exit realm or disconnect, ensure user unlistens to everything in the realm they were in
+    }
+
+    private handleBinFseSetCommand(senderUser: RelayUser, entityName: string, data: Buffer, includeSender: boolean): void {
         if (senderUser.realm === null) {
             return;
         }
@@ -275,7 +287,7 @@ export default class RelayManager {
         this.fseManager.updateData(senderUser.realm.id, name, start, data);
 
         const packet = new BinaryPacketWriter();
-        packet.writeByte(binaryCommandNumbers.get('fseUpdate'));
+        packet.writeByte(binaryClientCommandNumbers.get('fseUpdate'));
         packet.writeUint32(senderUser.id);
         packet.writeString(name);
         packet.writeUint32(start);
@@ -401,7 +413,7 @@ export default class RelayManager {
     private sendBinary(user: RelayUser, packet: Buffer) {
         if (this.config.logOutgoing) {
             const command = packet?.[0] ?? -1;
-            const commandName = binaryCommandNames.get(command) ?? command;
+            const commandName = binaryClientCommandNames.get(command) ?? command;
             console.log(`[${user.id}|Out] ${commandName} (${packet.length - 1} bytes)`);
         }
         user.connection.sendBytes(packet);

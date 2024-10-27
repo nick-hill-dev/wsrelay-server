@@ -18,6 +18,10 @@
             font-family: Consolas;
             font-size: 12pt;
             line-height: 0;
+            max-height: 50vh;
+            overflow-y: scroll;
+            background-color: rgb(240, 240, 240);
+            margin: 5px 0 5px 0;
         }
 
         #connectedDiv {
@@ -30,7 +34,9 @@
         function log(text) {
             let p = document.createElement('p');
             p.textContent = text;
-            document.getElementById('messagesDiv').appendChild(p);
+            const div = document.getElementById('messagesDiv');
+            div.appendChild(p);
+            div.scrollTop = div.scrollHeight;
         }
 
         function sendInternal(command) {
@@ -72,7 +78,16 @@
                 document.getElementById('connectedDiv').style.display = 'none';
             };
             client.onmessage = ev => {
-                log(`In: ${ev.data}`);
+                if (typeof ev.data === 'string') {
+                    log(`In: ${ev.data}`);
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const byteArray = new Uint8Array(event.target.result);
+                        log(`In: ${Array.from(byteArray).join(', ')}`);
+                    };
+                    reader.readAsArrayBuffer(ev.data); // Read the Blob as an ArrayBuffer
+                }
             };
         }
 

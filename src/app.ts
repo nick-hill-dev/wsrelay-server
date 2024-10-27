@@ -76,7 +76,7 @@ wsServer.on('request', (request) => {
             if (message.type === 'utf8') {
                 manager.handleUtf8Message(userId, message.utf8Data);
             } else if (message.type === 'binary') {
-                console.log(`[${userId}|Binary|In] (${message.binaryData.length} bytes)`);
+                manager.handleBinaryMessage(userId, message.binaryData);
             }
         } catch (e) {
             console.error(`[Error] {Handling Message} ${e}`);

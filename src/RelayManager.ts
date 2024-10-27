@@ -2,6 +2,9 @@ import { connection } from "websocket";
 import RelayRealm from "./RelayRealm";
 import RelayUser from "./RelayUser";
 import EntityManager from "./EntityManager";
+import { binaryCommandNames, binaryCommandNumbers } from "./BinaryCommand";
+import { BinaryPacketWriter } from "./BinaryPacketWriter";
+import { BinaryPacketReader } from "./BinaryPacketReader";
 
 export default class RelayManager {
 
@@ -44,19 +47,19 @@ export default class RelayManager {
     }
 
     public handleUtf8Message(userId: number, packet: string): void {
-        let user = this.users[userId];
+        const user = this.users[userId];
         if (!user) {
             return;
         }
 
-        let realmId = user.realm ? user.realm.id : -1;
+        const realmId = user.realm ? user.realm.id : -1;
         if (this.config.logIncoming) {
-            console.log(`[${userId}:${realmId === -1 ? '?' : realmId}|Message|In] ${packet}`);
+            console.log(`[${userId}:${realmId === -1 ? '?' : realmId}|UTF8|In] ${packet}`);
         }
 
-        let spaceIndex = packet.indexOf(' ');
-        let command = spaceIndex === -1 ? packet : packet.substring(0, spaceIndex);
-        let message = spaceIndex === -1 ? '' : packet.substring(spaceIndex + 1);
+        const spaceIndex = packet.indexOf(' ');
+        const command = spaceIndex === -1 ? packet : packet.substring(0, spaceIndex);
+        const message = spaceIndex === -1 ? '' : packet.substring(spaceIndex + 1);
 
         if (command.length === 0) {
             return;
@@ -65,27 +68,27 @@ export default class RelayManager {
         switch (command[0]) {
             case '^':
                 let realmNumberDirect = parseInt(command.substring(1));
-                this.handleJoinRealmDirectCommand(user, isNaN(realmNumberDirect) ? -1 : realmNumberDirect);
+                this.handleUtf8JoinRealmDirectCommand(user, isNaN(realmNumberDirect) ? -1 : realmNumberDirect);
                 break;
 
             case '&':
                 let realmNumberChild = parseInt(command.substring(1));
-                this.handleJoinRealmChildCommand(user, isNaN(realmNumberChild) ? -1 : realmNumberChild);
+                this.handleUtf8JoinRealmChildCommand(user, isNaN(realmNumberChild) ? -1 : realmNumberChild);
                 break;
 
             case '*':
-                this.handleSendToAllCommand(user, message);
+                this.handleUtf8SendToAllCommand(user, message);
                 break;
 
             case '!':
-                this.handleSendToAllExceptMeCommand(user, message);
+                this.handleUtf8SendToAllExceptMeCommand(user, message);
                 break;
 
             case '@':
                 let targetUserId = parseInt(command.substring(1));
                 let targetUser = this.users[targetUserId];
                 if (targetUser) {
-                    this.handleSendToUserCommand(user, targetUser, message);
+                    this.handleUtf8SendToUserCommand(user, targetUser, message);
                 }
                 break;
 
@@ -93,7 +96,7 @@ export default class RelayManager {
                 let targetRealmId = parseInt(command.substring(1));
                 let targetRealm = this.realms[targetRealmId];
                 if (targetRealm) {
-                    this.handleSendToRealmCommand(user, targetRealm, message);
+                    this.handleUtf8SendToRealmCommand(user, targetRealm, message);
                 }
                 break;
 
@@ -103,7 +106,7 @@ export default class RelayManager {
                     let loadDataCommaIndex = loadDataFragment?.indexOf(',') ?? -1;
                     let loadDataRealmId = loadDataCommaIndex === -1 ? -1 : parseInt(loadDataFragment.substring(0, loadDataCommaIndex));
                     let loadDataEntityName = loadDataCommaIndex === -1 ? loadDataFragment : loadDataFragment.substring(loadDataCommaIndex + 1);
-                    this.handleLoadDataCommand(user, loadDataRealmId, loadDataEntityName);
+                    this.handleUtf8LoadDataCommand(user, loadDataRealmId, loadDataEntityName);
                 }
                 break;
 
@@ -113,62 +116,94 @@ export default class RelayManager {
                     let saveDataCommaIndex = saveDataFragment?.indexOf(',') ?? -1;
                     let saveDataEntityName = saveDataCommaIndex === -1 ? saveDataFragment : saveDataFragment.substring(0, saveDataCommaIndex);
                     let saveDataExpireTime = saveDataCommaIndex === -1 ? 0 : parseInt(saveDataFragment.substring(saveDataCommaIndex + 1));
-                    this.handleSaveDataCommand(user, saveDataEntityName, saveDataExpireTime, message);
+                    this.handleUtf8SaveDataCommand(user, saveDataEntityName, saveDataExpireTime, message);
                 }
                 break;
         }
     }
 
-    private handleJoinRealmDirectCommand(senderUser: RelayUser, realmId: number) {
+    public handleBinaryMessage(userId: number, packet: Buffer): void {
+        if (packet.length < 1) {
+            return;
+        }
+
+        const user = this.users[userId];
+        if (!user) {
+            return;
+        }
+
+        const realmId = user.realm ? user.realm.id : -1;
+        const reader = new BinaryPacketReader(packet);
+        const command = reader.readByte();
+        const commandName = binaryCommandNames.get(command) ?? command;
+        if (this.config.logIncoming) {
+            console.log(`[${userId}:${realmId === -1 ? '?' : realmId}|Binary|In] ${commandName} (${packet.length - 1} bytes)`);
+        }
+
+        switch (commandName) {
+            case 'loadBinaryData':
+                const loadDataEntityName = reader.readString();
+                this.handleBinLoadDataCommand(user, realmId, loadDataEntityName);
+                break;
+
+            case 'saveBinaryData':
+                const saveDataEntityName = reader.readString();
+                const saveDataBytes = reader.readBuffer();
+                this.handleBinSaveDataCommand(user, saveDataEntityName, saveDataBytes);
+                break;
+        }
+    }
+
+    private handleUtf8JoinRealmDirectCommand(senderUser: RelayUser, realmId: number) {
         if (realmId === -1) {
             realmId = this.availableRealmIds.length > 0 ? this.availableRealmIds.shift() : this.nextRealmId++;
         }
         this.changeRealm(senderUser, realmId, false);
     }
 
-    private handleJoinRealmChildCommand(senderUser: RelayUser, realmId: number) {
+    private handleUtf8JoinRealmChildCommand(senderUser: RelayUser, realmId: number) {
         if (realmId === -1) {
             realmId = this.availableRealmIds.length > 0 ? this.availableRealmIds.shift() : this.nextRealmId++;
         }
         this.changeRealm(senderUser, realmId, true);
     }
 
-    private handleSendToAllCommand(senderUser: RelayUser, message: string): void {
+    private handleUtf8SendToAllCommand(senderUser: RelayUser, message: string): void {
         if (senderUser.realm === null) {
             return;
         }
         for (let realmUser of senderUser.realm.users) {
-            this.send(realmUser, `*${senderUser.id} ${message}`);
+            this.sendUtf8(realmUser, `*${senderUser.id} ${message}`);
         }
     }
 
-    private handleSendToAllExceptMeCommand(senderUser: RelayUser, message: string): void {
+    private handleUtf8SendToAllExceptMeCommand(senderUser: RelayUser, message: string): void {
         if (senderUser.realm === null) {
             return;
         }
         for (let realmUser of senderUser.realm.users) {
             if (realmUser.id !== senderUser.id) {
-                this.send(realmUser, `!${senderUser.id} ${message}`);
+                this.sendUtf8(realmUser, `!${senderUser.id} ${message}`);
             }
         }
     }
 
-    private handleSendToUserCommand(senderUser: RelayUser, targetUser: RelayUser, message: string): void {
+    private handleUtf8SendToUserCommand(senderUser: RelayUser, targetUser: RelayUser, message: string): void {
         if (senderUser.realm === null) {
             return;
         }
-        this.send(targetUser, `@${senderUser.id} ${message}`);
+        this.sendUtf8(targetUser, `@${senderUser.id} ${message}`);
     }
 
-    private handleSendToRealmCommand(senderUser: RelayUser, targetRealm: RelayRealm, message: string): void {
+    private handleUtf8SendToRealmCommand(senderUser: RelayUser, targetRealm: RelayRealm, message: string): void {
         if (senderUser.realm === null || targetRealm.users.length === 0) {
             return;
         }
         let targetUser = targetRealm.users[0];
-        this.send(targetUser, `@${senderUser.id} ${message}`);
+        this.sendUtf8(targetUser, `@${senderUser.id} ${message}`);
     }
 
-    private handleLoadDataCommand(senderUser: RelayUser, realmId: number, entityName: string): void {
+    private handleUtf8LoadDataCommand(senderUser: RelayUser, realmId: number, entityName: string): void {
         if (senderUser.realm === null) {
             return;
         }
@@ -176,19 +211,42 @@ export default class RelayManager {
             realmId = senderUser.realm.id;
         }
         let fragment = realmId === senderUser.realm.id ? entityName : realmId + ',' + entityName;
-        let data = this.entityManager.loadData(realmId, entityName);
+        let data = this.entityManager.loadData(realmId, 'utf8', entityName);
         if (data === '') {
-            this.send(senderUser, `<${fragment}`);
+            this.sendUtf8(senderUser, `<${fragment}`);
         } else {
-            this.send(senderUser, `<${fragment} ${data}`);
+            this.sendUtf8(senderUser, `<${fragment} ${data}`);
         }
     }
 
-    private handleSaveDataCommand(senderUser: RelayUser, entityName: string, time: number, data: string): void {
+    private handleUtf8SaveDataCommand(senderUser: RelayUser, entityName: string, time: number, data: string): void {
         if (senderUser.realm === null) {
             return;
         }
-        this.entityManager.saveData(senderUser.realm.id, entityName, time, data);
+        this.entityManager.saveData(senderUser.realm.id, 'utf8', entityName, time, data);
+    }
+
+    private handleBinLoadDataCommand(senderUser: RelayUser, realmId: number, entityName: string): void {
+        if (senderUser.realm === null) {
+            return;
+        }
+        if (realmId === -1) {
+            realmId = senderUser.realm.id;
+        }
+        let data = this.entityManager.loadData(realmId, 'binary', entityName);
+
+        const packet = new BinaryPacketWriter();
+        packet.writeByte(binaryCommandNumbers.get('loadBinaryData'));
+        packet.writeString(entityName);
+        packet.writeBuffer(data);
+        this.sendBinary(senderUser, packet.toBuffer());
+    }
+
+    private handleBinSaveDataCommand(senderUser: RelayUser, entityName: string, data: Buffer): void {
+        if (senderUser.realm === null) {
+            return;
+        }
+        this.entityManager.saveData(senderUser.realm.id, 'binary', entityName, 0, data);
     }
 
     /**
@@ -214,7 +272,7 @@ export default class RelayManager {
             oldRealm.users.splice(oldRealm.users.indexOf(user), 1);
             user.realm = null;
             for (let realmUser of oldRealm.users) {
-                this.send(realmUser, `-${user.id}`);
+                this.sendUtf8(realmUser, `-${user.id}`);
             }
         }
 
@@ -237,27 +295,27 @@ export default class RelayManager {
             user.realm = newRealm;
 
             // Advise user that the new realm has been joined successfully
-            this.send(user, `${createChildRealm ? "&" : "^"}${targetRealmId}`);
+            this.sendUtf8(user, `${createChildRealm ? "&" : "^"}${targetRealmId}`);
 
             // Advise user of all child realms already existing in the new realm
             for (let realm of newRealm.childRealms) {
-                this.send(user, `{${realm.id}`);
+                this.sendUtf8(user, `{${realm.id}`);
             }
 
             // Advise user of all other users already connected to that realm
             let otherRealmUsers = newRealm.users.filter(u => u !== user);
-            this.send(user, `=${otherRealmUsers.map(u => u.id).join(',')}`);
+            this.sendUtf8(user, `=${otherRealmUsers.map(u => u.id).join(',')}`);
 
             // Advise everyone in the target realm that user has joined
             for (let realmUser of otherRealmUsers) {
-                this.send(realmUser, `+${user.id}`);
+                this.sendUtf8(realmUser, `+${user.id}`);
             }
         }
 
         // Advise everyone in the old realm that there is a new child realm
         if (createChildRealm) {
             for (let realmUser of oldRealm.users) {
-                this.send(realmUser, `{${newRealm.id}`);
+                this.sendUtf8(realmUser, `{${newRealm.id}`);
             }
         }
 
@@ -271,7 +329,7 @@ export default class RelayManager {
 
                 // Advise users of the parent realm that the child realm has been destroyed
                 for (let realmUser of currentRealm.parentRealm.users) {
-                    this.send(realmUser, `}${currentRealm.id}`);
+                    this.sendUtf8(realmUser, `}${currentRealm.id}`);
                 }
             }
 
@@ -291,11 +349,20 @@ export default class RelayManager {
         }
     }
 
-    private send(user: RelayUser, packet: string) {
+    private sendUtf8(user: RelayUser, packet: string) {
         if (this.config.logOutgoing) {
             console.log(`[${user.id}|Out] ${packet}`);
         }
         user.connection.sendUTF(packet);
+    }
+
+    private sendBinary(user: RelayUser, packet: Buffer) {
+        if (this.config.logOutgoing) {
+            const command = packet?.[0] ?? -1;
+            const commandName = binaryCommandNames.get(command) ?? command;
+            console.log(`[${user.id}|Out] ${commandName} (${packet.length - 1} bytes)`);
+        }
+        user.connection.sendBytes(packet);
     }
 
 }

@@ -77,6 +77,11 @@ There is no direct support for the wss:// protocol at present but it is possible
 </VirtualHost>
 ```
 
+## Version History
+
+- **2.0**: Initial release.
+- **2.1**: Support for a binary version of the WSRelay protocol as well as support for Fully Synchronised Entities.
+
 ## C# Version (2019)
 
 The original version of WebSocket Relay server was created many years ago and originally published as a part of the "Social Poker" solution [released in 2019](https://github.com/nick-hill-dev/social-poker) (under the `Application Server/WSRelay/(mono)` folder). This repository is a complete rewrite of that C# version in order to improve stability and make it simpler to use and configure. This version of the WebSocket Relay server retains 100% compatibility with the original.

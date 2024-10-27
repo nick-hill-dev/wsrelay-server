@@ -2,3 +2,4 @@ bin
 node_modules
 build
 data/*.e
+data/*.be

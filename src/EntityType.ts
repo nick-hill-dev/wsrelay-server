@@ -1,0 +1,1 @@
+export type EntityType = 'utf8' | 'binary';

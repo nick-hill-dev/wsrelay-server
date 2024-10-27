@@ -32,6 +32,15 @@ export default class FseManager {
         this.saveDataInternal(fileName, data);
     }
 
+    public updateData(realmId: number, entityName: string, start: number, data: Buffer): void {
+        if (!this.isValidEntityName(entityName)) {
+            return;
+        }
+        const fileName = this.getFullFileName(realmId, entityName);
+        // TODO: Implement
+        throw new Error('Not yet implemented fully.');
+    }
+
     public deleteData(realmId: number) {
         for (let fileName of fs.readdirSync(this.path)) {
             if (fileName.startsWith(`realm.${realmId}.`) && fileName.endsEith('.fse')) {
@@ -42,7 +51,7 @@ export default class FseManager {
 
     private loadAndProcessDataInternal(fileName: string): Buffer {
         const allData = fs.readFileSync(fileName);
-        // TODO: Implement capabilities
+        // TODO: Implement capabilities?
         //const capabilities = allData[0];
         //if (capabilities !== 1) {
         //return Buffer.alloc(0);

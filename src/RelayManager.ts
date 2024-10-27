@@ -238,6 +238,8 @@ export default class RelayManager {
         this.entityManager.saveData(senderUser.realm.id, entityName, time, data);
     }
 
+    // TODO: Need a "FSE Unlisten" command
+
     private handleBinFseListenCommand(senderUser: RelayUser, realmId: number, entityName: string): void {
         if (senderUser.realm === null) {
             return;
@@ -252,6 +254,8 @@ export default class RelayManager {
         packet.writeString(entityName);
         packet.writeBuffer(data);
         this.sendBinary(senderUser, packet.toBuffer());
+
+        // TODO: All future updates to the file need to be sent to this user
     }
 
     private handleBinFseSetCommand(senderUser: RelayUser, entityName: string, data: Buffer): void {
@@ -259,6 +263,8 @@ export default class RelayManager {
             return;
         }
         this.fseManager.saveData(senderUser.realm.id, entityName, data);
+
+        // TODO: Pass updates to all other people who are listening to this file
     }
 
     private handleBinFseUpdateCommand(senderUser: RelayUser, name: string, start: number, data: Buffer, includeSender: boolean): void {
@@ -266,7 +272,7 @@ export default class RelayManager {
             return;
         }
 
-        this.fseManager.update(name, start, data);
+        this.fseManager.updateData(senderUser.realm.id, name, start, data);
 
         const packet = new BinaryPacketWriter();
         packet.writeByte(binaryCommandNumbers.get('fseUpdate'));
@@ -276,6 +282,7 @@ export default class RelayManager {
         packet.writeBuffer(data);
         const packetAsBuffer = packet.toBuffer();
 
+        // TODO: Send updates only to those who are listening to changes to the file
         for (let realmUser of senderUser.realm.users) {
             if (includeSender || realmUser.id !== senderUser.id) {
                 this.sendBinary(realmUser, packetAsBuffer);

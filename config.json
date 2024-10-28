@@ -8,6 +8,7 @@
     ],
     "publicRealmCount": 65536,
     "entityPath": "./data",
+    "fsePath": "./data",
     "logIncoming": false,
     "logOutgoing": false
 }

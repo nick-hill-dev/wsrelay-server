@@ -55,7 +55,8 @@ The service is configured via config.json as follows:
         "*" // This accepts all protocols.
     ],
     "publicRealmCount": 65536, // The number of reserved realms, where data is not deleted, and temporary realm IDs are above this number.
-    "entityPath": "./data", // The location of where to store data that clients have asked to save on the server, I.E. game state etc.
+    "entityPath": "./data", // Storage location for data entities clients ask to save on the server, I.E. game state etc.
+    "fsePath": "./data", // Storage location for Fully Synchronised Entities. Defaults to the value of "entityPath".
     "logIncoming": false, // Indicates whether or not to write messages to the console based on what messages the server has received.
     "logOutgoing": false // Indicates whether or not to write messages to the console based on what messages the server has sent.
 }

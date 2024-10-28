@@ -27,7 +27,7 @@ export default class RelayManager {
     public constructor(public readonly config: IConfig) {
         this.nextRealmId = config.publicRealmCount;
         this.entityManager = new EntityManager(config.entityPath);
-        this.fseManager = new FseManager(config.entityPath);
+        this.fseManager = new FseManager(config.fsePath);
     }
 
     public registerUser(connection: connection): number {

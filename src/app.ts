@@ -15,6 +15,11 @@ if (!fs.existsSync(config.entityPath)) {
     fs.mkdirSync(config.entityPath);
 }
 
+const fsePath = config.fsePath ?? config.entityPath;
+if (!fs.existsSync(fsePath)) {
+    fs.mkdirSync(fsePath);
+}
+
 let manager = new RelayManager(config);
 
 let server = http.createServer((request: any, response: any) => {

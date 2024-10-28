@@ -10,7 +10,9 @@ interface IConfig {
 
     entityPath: string;
 
-    fsePath: string;
+    fsePath?: string;
+
+    fseMaxSize?: number;
 
     logIncoming: boolean;
 

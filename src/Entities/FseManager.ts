@@ -2,7 +2,9 @@ const fs = require('fs');
 
 export default class FseManager {
 
-    public constructor(public readonly path: string) {
+    public constructor(
+        public readonly path: string,
+        public readonly maxSize: number) {
     }
 
     public loadData(realmId: number, entityName: string): Buffer {
@@ -33,8 +35,11 @@ export default class FseManager {
     }
 
     public updateData(realmId: number, entityName: string, start: number, data: Buffer): void {
-        if (!this.isValidEntityName(entityName)) {
+        if (data.length === 0 || !this.isValidEntityName(entityName)) {
             return;
+        }
+        if (start + data.length > this.maxSize) {
+            throw new Error('FSE update would cause the file to be too large. FSE update aborted.');
         }
         const fileName = this.getFullFileName(realmId, entityName);
         // TODO: Implement

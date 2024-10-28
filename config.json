@@ -9,6 +9,7 @@
     "publicRealmCount": 65536,
     "entityPath": "./data",
     "fsePath": "./data",
+    "fseMaxSize": 131072,
     "logIncoming": false,
     "logOutgoing": false
 }

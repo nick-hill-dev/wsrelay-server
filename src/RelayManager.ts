@@ -5,8 +5,8 @@ import EntityManager from "./Entities/EntityManager";
 import { BinaryPacketWriter } from "./BinaryPacketWriter";
 import { BinaryPacketReader } from "./BinaryPacketReader";
 import FseManager from "./Entities/FseManager";
-import { binaryServerCommandNames } from "./BinaryCommandServer";
-import { binaryClientCommandNames, binaryClientCommandNumbers } from "./BinaryCommandClient";
+import { binaryServerCommandNames } from "./BinaryServerCommandName";
+import { binaryClientCommandNames, binaryClientCommandNumbers } from "./BinaryClientCommandName";
 
 export default class RelayManager {
 
@@ -27,7 +27,7 @@ export default class RelayManager {
     public constructor(public readonly config: IConfig) {
         this.nextRealmId = config.publicRealmCount;
         this.entityManager = new EntityManager(config.entityPath);
-        this.fseManager = new FseManager(config.fsePath);
+        this.fseManager = new FseManager(config.fsePath, config.fseMaxSize ?? 131072);
     }
 
     public registerUser(connection: connection): number {
@@ -147,27 +147,27 @@ export default class RelayManager {
 
         switch (commandName) {
             case 'fseListen':
-                const fseListenEntityName = reader.readString();
-                this.handleBinFseListenCommand(user, fseListenEntityName);
+                const fseListenName = reader.readString(1);
+                this.handleBinFseListenCommand(user, fseListenName);
                 break;
 
             case 'fseUnlisten':
-                const fseUnlistenEntityName = reader.readString();
-                this.handleBinFseUnlistenCommand(user, fseListenEntityName);
+                const fseUnlistenName = reader.readString(1);
+                this.handleBinFseUnlistenCommand(user, fseUnlistenName);
                 break;
 
             case 'fseSet':
             case 'fseSetIncludeMe':
-                const fseSetEntityName = reader.readString();
-                const fseSetBytes = reader.readBuffer();
-                this.handleBinFseSetCommand(user, fseSetEntityName, fseSetBytes, commandName === 'fseSetIncludeMe');
+                const fseSetName = reader.readString(1);
+                const fseSetBytes = reader.readBuffer(4);
+                this.handleBinFseSetCommand(user, fseSetName, fseSetBytes, commandName === 'fseSetIncludeMe');
                 break;
 
             case 'fseUpdate':
             case 'fseUpdateIncludeMe':
-                const fseUpdateName = reader.readString();
+                const fseUpdateName = reader.readString(1);
                 const fseUpdateStart = reader.readUint32();
-                const fseUpdateData = reader.readBuffer();
+                const fseUpdateData = reader.readBuffer(2);
                 this.handleBinFseUpdateCommand(user, fseUpdateName, fseUpdateStart, fseUpdateData, commandName === 'fseUpdateIncludeMe');
                 break;
         }

@@ -1,4 +1,4 @@
-const fs = require('fs');
+import fs from 'fs';
 
 export default class EntityManager {
 
@@ -36,7 +36,7 @@ export default class EntityManager {
 
     public deleteData(realmId: number) {
         for (let fileName of fs.readdirSync(this.path)) {
-            if (fileName.startsWith(`realm.${realmId}.`) && (fileName.endsEith('.entity') || fileName.endsEith('.e'))) {
+            if (fileName.startsWith(`realm.${realmId}.`) && (fileName.endsWith('.entity') || fileName.endsWith('.e'))) {
                 fs.unlinkSync(`${this.path}/${fileName}`);
             }
         }

@@ -249,7 +249,7 @@ export default class RelayManager {
         if (senderUser.realm === null) {
             return;
         }
-        let data = this.fseManager.loadData(senderUser.realm.id, entityName);
+        let data = this.fseManager.getData(senderUser.realm.id, entityName);
 
         const packet = new BinaryPacketWriter();
         packet.writeByte(binaryClientCommandNumbers.get('fseData'));
@@ -274,7 +274,7 @@ export default class RelayManager {
         if (senderUser.realm === null) {
             return;
         }
-        this.fseManager.saveData(senderUser.realm.id, entityName, data);
+        this.fseManager.setData(senderUser.realm.id, entityName, data);
 
         // TODO: Pass updates to all other people who are listening to this file
     }

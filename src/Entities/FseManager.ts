@@ -1,4 +1,4 @@
-const fs = require('fs');
+import fs from 'fs';
 
 export default class FseManager {
 
@@ -7,7 +7,7 @@ export default class FseManager {
         public readonly maxSize: number) {
     }
 
-    public loadData(realmId: number, entityName: string): Buffer {
+    public getData(realmId: number, entityName: string): Buffer {
         if (!this.isValidEntityName(entityName)) {
             return Buffer.alloc(0);
         }
@@ -19,7 +19,7 @@ export default class FseManager {
         return this.loadAndProcessDataInternal(fileName);
     }
 
-    public saveData(realmId: number, entityName: string, data: Buffer): void {
+    public setData(realmId: number, entityName: string, data: Buffer): void {
         if (!this.isValidEntityName(entityName)) {
             return;
         }
@@ -34,21 +34,32 @@ export default class FseManager {
         this.saveDataInternal(fileName, data);
     }
 
-    public updateData(realmId: number, entityName: string, start: number, data: Buffer): void {
+    public updateData(realmId: number, entityName: string, position: number, data: Buffer): void {
         if (data.length === 0 || !this.isValidEntityName(entityName)) {
             return;
         }
-        if (start + data.length > this.maxSize) {
+        if (position + data.length > this.maxSize) {
             throw new Error('FSE update would cause the file to be too large. FSE update aborted.');
         }
+
         const fileName = this.getFullFileName(realmId, entityName);
-        // TODO: Implement
-        throw new Error('Not yet implemented fully.');
+        const fd = fs.openSync(fileName, 'r+');
+        try {
+            const stats = fs.fstatSync(fd);
+            const bufferExpansionNeeded = position > stats.size ? Buffer.alloc(position - stats.size) : null;
+            if (bufferExpansionNeeded) {
+                fs.writeSync(fd, bufferExpansionNeeded, 0, bufferExpansionNeeded.length, stats.size);
+            }
+            fs.writeSync(fd, data, 0, data.length, position);
+        }
+        finally {
+            fs.closeSync(fd);
+        }
     }
 
     public deleteData(realmId: number) {
         for (let fileName of fs.readdirSync(this.path)) {
-            if (fileName.startsWith(`realm.${realmId}.`) && fileName.endsEith('.fse')) {
+            if (fileName.startsWith(`realm.${realmId}.`) && fileName.endsWith('.fse')) {
                 fs.unlinkSync(`${this.path}/${fileName}`);
             }
         }

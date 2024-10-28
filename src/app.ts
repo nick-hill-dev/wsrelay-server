@@ -7,8 +7,8 @@ import { connection, request, server as WSServer } from 'websocket';
 let WebSocketServer = require('websocket').server;
 let http = require('http');
 
-const fs = require('fs');
-let configText = fs.readFileSync('config.json');
+import fs from 'fs';
+let configText = fs.readFileSync('config.json', 'utf8');
 let config = <IConfig>JSON.parse(configText);
 
 if (!fs.existsSync(config.entityPath)) {

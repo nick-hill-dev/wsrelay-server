@@ -1,82 +1,106 @@
 import fs from 'fs';
+import { Fse } from './Fse';
+import RelayUser from '../RelayUser';
 
 export default class FseManager {
 
+    private readonly interval: NodeJS.Timeout = null;
+
+    private readonly fseList: Map<string, Fse> = new Map<string, Fse>();
+
+    private readonly emptyBuffer = Buffer.alloc(0);
+
     public constructor(
         public readonly path: string,
-        public readonly maxSize: number) {
+        private readonly maxSize: number
+    ) {
+        this.interval = setInterval(() => this.persistFses(), 5 * 60 * 1000);
     }
 
     public getData(realmId: number, entityName: string): Buffer {
+
         if (!this.isValidEntityName(entityName)) {
-            return Buffer.alloc(0);
-        }
-        let fileName = this.getFullFileName(realmId, entityName);
-        if (!fs.existsSync(fileName)) {
-            return Buffer.alloc(0);
+            return this.emptyBuffer;
         }
 
-        return this.loadAndProcessDataInternal(fileName);
+        const fse = this.getOrCreateFse(realmId, entityName);
+        return Buffer.from(fse.toUint8Array());
     }
 
-    public setData(realmId: number, entityName: string, data: Buffer): void {
+    public setData(realmId: number, entityName: string, data: Buffer): readonly RelayUser[] {
+
         if (!this.isValidEntityName(entityName)) {
             return;
         }
-        const fileName = this.getFullFileName(realmId, entityName);
-        if (data.length === 0) {
-            if (fs.existsSync(fileName)) {
-                fs.unlinkSync(fileName);
-            }
-            return;
-        }
 
-        this.saveDataInternal(fileName, data);
+        const fse = this.getOrCreateFse(realmId, entityName);
+        fse.setBytes(0, data);
+
+        return fse.getSubscribedUsers();
     }
 
-    public updateData(realmId: number, entityName: string, position: number, data: Buffer): void {
+    public updateData(realmId: number, entityName: string, position: number, data: Buffer): readonly RelayUser[] {
+
         if (data.length === 0 || !this.isValidEntityName(entityName)) {
             return;
         }
+
         if (position + data.length > this.maxSize) {
             throw new Error('FSE update would cause the file to be too large. FSE update aborted.');
         }
 
-        const fileName = this.getFullFileName(realmId, entityName);
-        const fd = fs.openSync(fileName, 'r+');
-        try {
-            const stats = fs.fstatSync(fd);
-            const bufferExpansionNeeded = position > stats.size ? Buffer.alloc(position - stats.size) : null;
-            if (bufferExpansionNeeded) {
-                fs.writeSync(fd, bufferExpansionNeeded, 0, bufferExpansionNeeded.length, stats.size);
-            }
-            fs.writeSync(fd, data, 0, data.length, position);
-        }
-        finally {
-            fs.closeSync(fd);
-        }
+        const fse = this.getOrCreateFse(realmId, entityName);
+        fse.setBytes(position, data);
+
+        return fse.getSubscribedUsers();
     }
 
-    public deleteData(realmId: number) {
-        for (let fileName of fs.readdirSync(this.path)) {
+    public handleRealmDeleted(realmId: number) {
+        for (const fileName of fs.readdirSync(this.path)) {
             if (fileName.startsWith(`realm.${realmId}.`) && fileName.endsWith('.fse')) {
                 fs.unlinkSync(`${this.path}/${fileName}`);
             }
         }
+        const keysToDelete = [];
+        for (const name of this.fseList.keys()) {
+            if (name.startsWith(`${realmId}-`)) {
+                keysToDelete.push(name);
+            }
+        }
+        for (const key of keysToDelete) {
+            this.fseList.delete(key);
+        }
     }
 
-    private loadAndProcessDataInternal(fileName: string): Buffer {
-        const allData = fs.readFileSync(fileName);
-        // TODO: Implement capabilities?
-        //const capabilities = allData[0];
-        //if (capabilities !== 1) {
-        //return Buffer.alloc(0);
-        //}
-        return allData.subarray(0);
+    public subscribeUser(user: RelayUser, entityName: string): void {
+        const fse = this.getOrCreateFse(user.realm.id, entityName);
+        fse.subscribeUser(user);
     }
 
-    private saveDataInternal(fileName: string, data: Buffer): void {
-        fs.writeFileSync(fileName, data);
+    public unsubscribeUser(user: RelayUser, entityName: string): void {
+        const fseName = `${user.realm.id}-${entityName}`;
+        const fse = this.fseList.get(fseName);
+        if (fse) {
+            fse.unsubscribeUser(user);
+        }
+    }
+
+    public unsubscribeUserFromAll(user: RelayUser): void {
+        for (const fse of this.fseList.values()) {
+            fse.unsubscribeUser(user);
+        }
+    }
+
+    private getOrCreateFse(realmId: number, entityName: string, initialData: Buffer = undefined): Fse {
+        const fseName = `${realmId}-${entityName}`;
+        const existingFse = this.fseList.get(fseName);
+        if (existingFse) {
+            return existingFse;
+        }
+        const fileName = this.getFullFileName(realmId, entityName);
+        const newFse = new Fse(fileName, initialData);
+        this.fseList.set(fseName, newFse);
+        return newFse;
     }
 
     private getFullFileName(realmId: number, entityName: string): string {
@@ -86,6 +110,19 @@ export default class FseManager {
 
     private isValidEntityName(name: string): boolean {
         return /^\w+$/.test(name);
+    }
+
+    private persistFses(): void {
+        const fseListToRemove = [];
+        for (const name of this.fseList.keys()) {
+            const fse = this.fseList.get(name);
+            if (!fse.save()) {
+                fseListToRemove.push(name);
+            }
+        }
+        for (const fseToRemove of fseListToRemove) {
+            this.fseList.delete(fseToRemove);
+        }
     }
 
 }

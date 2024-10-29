@@ -34,7 +34,7 @@ export default class EntityManager {
         this.saveDataInternal(fileName, time, data);
     }
 
-    public deleteData(realmId: number) {
+    public handleRealmDeleted(realmId: number) {
         for (let fileName of fs.readdirSync(this.path)) {
             if (fileName.startsWith(`realm.${realmId}.`) && (fileName.endsWith('.entity') || fileName.endsWith('.e'))) {
                 fs.unlinkSync(`${this.path}/${fileName}`);

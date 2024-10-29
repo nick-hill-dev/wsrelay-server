@@ -167,8 +167,8 @@ export default class RelayManager {
             case 'fseUpdateIncludeMe':
                 const fseUpdateName = reader.readString(1);
                 const fseUpdateStart = reader.readUint32();
-                const fseUpdateData = reader.readBuffer(2);
-                this.handleBinFseUpdateCommand(user, fseUpdateName, fseUpdateStart, fseUpdateData, commandName === 'fseUpdateIncludeMe');
+                const fseUpdateBytes = reader.readBuffer(2);
+                this.handleBinFseUpdateCommand(user, fseUpdateName, fseUpdateStart, fseUpdateBytes, commandName === 'fseUpdateIncludeMe');
                 break;
         }
     }
@@ -250,6 +250,7 @@ export default class RelayManager {
             return;
         }
 
+        console.log(`[${senderUser.id}|${senderUser.realm.id}|FSE|Listen] ${entityName}`);
         this.fseManager.subscribeUser(senderUser, entityName);
 
         const data = this.fseManager.getData(senderUser.realm.id, entityName);
@@ -266,6 +267,7 @@ export default class RelayManager {
             return;
         }
 
+        console.log(`[${senderUser.id}|${senderUser.realm.id}|FSE|Unlisten] ${entityName}`);
         this.fseManager.unsubscribeUser(senderUser, entityName);
     }
 

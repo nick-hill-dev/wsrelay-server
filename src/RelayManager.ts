@@ -250,7 +250,7 @@ export default class RelayManager {
             return;
         }
 
-        console.log(`[${senderUser.id}|${senderUser.realm.id}|FSE|Listen] ${entityName}`);
+        console.log(`[${senderUser.id}|${senderUser.realm.id}:FSE|Listen] ${entityName}`);
         this.fseManager.subscribeUser(senderUser, entityName);
 
         const data = this.fseManager.getData(senderUser.realm.id, entityName);
@@ -267,7 +267,7 @@ export default class RelayManager {
             return;
         }
 
-        console.log(`[${senderUser.id}|${senderUser.realm.id}|FSE|Unlisten] ${entityName}`);
+        console.log(`[${senderUser.id}|${senderUser.realm.id}:FSE|Unlisten] ${entityName}`);
         this.fseManager.unsubscribeUser(senderUser, entityName);
     }
 

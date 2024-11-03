@@ -54,7 +54,7 @@ export class Fse {
         return this.buffer.slice(0, this.length);
     }
 
-    public static load(fileName: string): Fse {
+    public static loadOrCreate(fileName: string): Fse {
         if (!fs.existsSync(fileName)) {
             return new Fse(fileName);
         }

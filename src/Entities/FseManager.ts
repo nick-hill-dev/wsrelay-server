@@ -91,14 +91,14 @@ export default class FseManager {
         }
     }
 
-    private getOrCreateFse(realmId: number, entityName: string, initialData: Buffer = undefined): Fse {
+    private getOrCreateFse(realmId: number, entityName: string): Fse {
         const fseName = `${realmId}-${entityName}`;
         const existingFse = this.fseList.get(fseName);
         if (existingFse) {
             return existingFse;
         }
         const fileName = this.getFullFileName(realmId, entityName);
-        const newFse = new Fse(fileName, initialData);
+        const newFse = Fse.loadOrCreate(fileName);
         this.fseList.set(fseName, newFse);
         return newFse;
     }

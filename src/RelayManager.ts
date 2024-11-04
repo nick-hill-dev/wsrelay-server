@@ -7,8 +7,12 @@ import { BinaryPacketReader } from "./BinaryPacketReader";
 import FseManager from "./Entities/FseManager";
 import { binaryServerCommandNames } from "./BinaryServerCommandName";
 import { binaryClientCommandNames, binaryClientCommandNumbers } from "./BinaryClientCommandName";
+import { IUtf8Operation } from "./Operations/IUtf8Operation";
+import { JoinRealmOperation } from "./Operations/JoinRealmOperation";
+import { IRelayManager } from "./IRelayManager";
+import { SendToAllOperation } from "./Operations/SendToAllOperation";
 
-export default class RelayManager {
+export default class RelayManager implements IRelayManager {
 
     public readonly users: RelayUser[] = [];
 
@@ -72,21 +76,13 @@ export default class RelayManager {
 
         switch (command[0]) {
             case '^':
-                let realmNumberDirect = parseInt(command.substring(1));
-                this.handleUtf8JoinRealmDirectCommand(user, isNaN(realmNumberDirect) ? -1 : realmNumberDirect);
-                break;
-
             case '&':
-                let realmNumberChild = parseInt(command.substring(1));
-                this.handleUtf8JoinRealmChildCommand(user, isNaN(realmNumberChild) ? -1 : realmNumberChild);
+                this.executeUtf8Operation(user, JoinRealmOperation, command, message);
                 break;
 
             case '*':
-                this.handleUtf8SendToAllCommand(user, message);
-                break;
-
             case '!':
-                this.handleUtf8SendToAllExceptMeCommand(user, message);
+                this.executeUtf8Operation(user, SendToAllOperation, command, message);
                 break;
 
             case '@':
@@ -170,40 +166,6 @@ export default class RelayManager {
                 const fseUpdateBytes = reader.readBuffer(2);
                 this.handleBinFseUpdateCommand(user, fseUpdateName, fseUpdateStart, fseUpdateBytes, commandName === 'fseUpdateIncludeMe');
                 break;
-        }
-    }
-
-    private handleUtf8JoinRealmDirectCommand(senderUser: RelayUser, realmId: number) {
-        if (realmId === -1) {
-            realmId = this.availableRealmIds.length > 0 ? this.availableRealmIds.shift() : this.nextRealmId++;
-        }
-        this.changeRealm(senderUser, realmId, false);
-    }
-
-    private handleUtf8JoinRealmChildCommand(senderUser: RelayUser, realmId: number) {
-        if (realmId === -1) {
-            realmId = this.availableRealmIds.length > 0 ? this.availableRealmIds.shift() : this.nextRealmId++;
-        }
-        this.changeRealm(senderUser, realmId, true);
-    }
-
-    private handleUtf8SendToAllCommand(senderUser: RelayUser, message: string): void {
-        if (senderUser.realm === null) {
-            return;
-        }
-        for (let realmUser of senderUser.realm.users) {
-            this.sendUtf8(realmUser, `*${senderUser.id} ${message}`);
-        }
-    }
-
-    private handleUtf8SendToAllExceptMeCommand(senderUser: RelayUser, message: string): void {
-        if (senderUser.realm === null) {
-            return;
-        }
-        for (let realmUser of senderUser.realm.users) {
-            if (realmUser.id !== senderUser.id) {
-                this.sendUtf8(realmUser, `!${senderUser.id} ${message}`);
-            }
         }
     }
 
@@ -314,11 +276,17 @@ export default class RelayManager {
         }
     }
 
+    public reserveNextAvailableRealmNumber(): number {
+        return this.availableRealmIds.length > 0
+            ? this.availableRealmIds.shift()
+            : this.nextRealmId++;
+    }
+
     /**
      * @param targetRealmId The target realm number, or -1 to leave a realm.
      * @param createChildRealm Indicates whether a request has been made to join a child realm (note targetRealmId will not be -1 in this case).
      */
-    private changeRealm(user: RelayUser, targetRealmId: number, createChildRealm: boolean) {
+    public changeRealm(user: RelayUser, targetRealmId: number, createChildRealm: boolean) {
 
         // Don't do anything if the user is staying in the same realm
         let becomingRealmless = targetRealmId === -1;
@@ -420,7 +388,13 @@ export default class RelayManager {
         }
     }
 
-    private sendUtf8(user: RelayUser, packet: string) {
+    private executeUtf8Operation(user: RelayUser, operationType: { new(): IUtf8Operation }, command: string, message: string) {
+        const operation = new operationType();
+        operation.decode(command, message);
+        operation.execute(user, this);
+    }
+
+    public sendUtf8(user: RelayUser, packet: string) {
         if (this.config.logOutgoing) {
             console.log(`[${user.id}|Out] ${packet}`);
         }

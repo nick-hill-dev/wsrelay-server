@@ -11,6 +11,8 @@ import { IUtf8Operation } from "./Operations/IUtf8Operation";
 import { JoinRealmOperation } from "./Operations/JoinRealmOperation";
 import { IRelayManager } from "./IRelayManager";
 import { SendToAllOperation } from "./Operations/SendToAllOperation";
+import { SendToUserOperation } from "./Operations/SendToUserOperation";
+import { SendToRealmOperation } from "./Operations/SendToRealmOperation";
 
 export default class RelayManager implements IRelayManager {
 
@@ -86,19 +88,11 @@ export default class RelayManager implements IRelayManager {
                 break;
 
             case '@':
-                let targetUserId = parseInt(command.substring(1));
-                let targetUser = this.users[targetUserId];
-                if (targetUser) {
-                    this.handleUtf8SendToUserCommand(user, targetUser, message);
-                }
+                this.executeUtf8Operation(user, SendToUserOperation, command, message);
                 break;
 
             case ':':
-                let targetRealmId = parseInt(command.substring(1));
-                let targetRealm = this.realms[targetRealmId];
-                if (targetRealm) {
-                    this.handleUtf8SendToRealmCommand(user, targetRealm, message);
-                }
+                this.executeUtf8Operation(user, SendToRealmOperation, command, message);
                 break;
 
             case '<':
@@ -167,21 +161,6 @@ export default class RelayManager implements IRelayManager {
                 this.handleBinFseUpdateCommand(user, fseUpdateName, fseUpdateStart, fseUpdateBytes, commandName === 'fseUpdateIncludeMe');
                 break;
         }
-    }
-
-    private handleUtf8SendToUserCommand(senderUser: RelayUser, targetUser: RelayUser, message: string): void {
-        if (senderUser.realm === null) {
-            return;
-        }
-        this.sendUtf8(targetUser, `@${senderUser.id} ${message}`);
-    }
-
-    private handleUtf8SendToRealmCommand(senderUser: RelayUser, targetRealm: RelayRealm, message: string): void {
-        if (senderUser.realm === null || targetRealm.users.length === 0) {
-            return;
-        }
-        let targetUser = targetRealm.users[0];
-        this.sendUtf8(targetUser, `@${senderUser.id} ${message}`);
     }
 
     private handleUtf8LoadDataCommand(senderUser: RelayUser, realmId: number, entityName: string): void {
@@ -274,6 +253,14 @@ export default class RelayManager implements IRelayManager {
                 this.sendBinary(realmUser, packetAsBuffer);
             }
         }
+    }
+
+    public getUserById(userId: number): RelayUser {
+        return this.users[userId];
+    }
+
+    public getRealmById(realmId: number): RelayRealm {
+        return this.realms[realmId];
     }
 
     public reserveNextAvailableRealmNumber(): number {
@@ -388,12 +375,6 @@ export default class RelayManager implements IRelayManager {
         }
     }
 
-    private executeUtf8Operation(user: RelayUser, operationType: { new(): IUtf8Operation }, command: string, message: string) {
-        const operation = new operationType();
-        operation.decode(command, message);
-        operation.execute(user, this);
-    }
-
     public sendUtf8(user: RelayUser, packet: string) {
         if (this.config.logOutgoing) {
             console.log(`[${user.id}|Out] ${packet}`);
@@ -408,6 +389,12 @@ export default class RelayManager implements IRelayManager {
             console.log(`[${user.id}|Out] ${commandName} (${packet.length - 1} bytes)`);
         }
         user.connection.sendBytes(packet);
+    }
+
+    private executeUtf8Operation(user: RelayUser, operationType: { new(): IUtf8Operation }, command: string, message: string) {
+        const operation = new operationType();
+        operation.decode(command, message);
+        operation.execute(user, this);
     }
 
 }

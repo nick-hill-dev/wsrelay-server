@@ -34,6 +34,7 @@ docker run wsrelay:latest # If you want to run it now
 - Distinction between permanent realms and temporary realms.
 - Can create or join child realms belonging to a parent realm, in a tree-like structure.
 - Can save data to realms and load data from them.
+- Supports automatic synchronisation of file data for all connected users.
 - Support for communication across different realms.
 - Can implement custom protocols on top of the basic WebSocket Relay protocol for highly customised applications.
 - Can specify which specific origins to accept, or all.

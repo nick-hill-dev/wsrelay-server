@@ -13,6 +13,9 @@ import { IRelayManager } from "./IRelayManager";
 import { SendToAllOperation } from "./Operations/SendToAllOperation";
 import { SendToUserOperation } from "./Operations/SendToUserOperation";
 import { SendToRealmOperation } from "./Operations/SendToRealmOperation";
+import { IdentifyOperation } from "./Operations/IdentifyOperation";
+import { LoadDataOperation } from "./Operations/LoadDataOperation";
+import { SaveDataOperation } from "./Operations/SaveDataOperation";
 
 export default class RelayManager implements IRelayManager {
 
@@ -65,7 +68,7 @@ export default class RelayManager implements IRelayManager {
 
         const realmId = user.realm ? user.realm.id : -1;
         if (this.config.logIncoming) {
-            console.log(`[${userId}:${realmId === -1 ? '?' : realmId}|UTF8|In] ${packet}`);
+            console.log(`[${user.name ?? userId}:${realmId === -1 ? '?' : realmId}|UTF8|In] ${packet}`);
         }
 
         const spaceIndex = packet.indexOf(' ');
@@ -82,6 +85,10 @@ export default class RelayManager implements IRelayManager {
                 this.executeUtf8Operation(user, JoinRealmOperation, command, message);
                 break;
 
+            case '~':
+                this.executeUtf8Operation(user, IdentifyOperation, command, message);
+                break;
+
             case '*':
             case '!':
                 this.executeUtf8Operation(user, SendToAllOperation, command, message);
@@ -96,23 +103,11 @@ export default class RelayManager implements IRelayManager {
                 break;
 
             case '<':
-                let loadDataFragment = command.substring(1);
-                if (loadDataFragment.length > 0) {
-                    let loadDataCommaIndex = loadDataFragment?.indexOf(',') ?? -1;
-                    let loadDataRealmId = loadDataCommaIndex === -1 ? -1 : parseInt(loadDataFragment.substring(0, loadDataCommaIndex));
-                    let loadDataEntityName = loadDataCommaIndex === -1 ? loadDataFragment : loadDataFragment.substring(loadDataCommaIndex + 1);
-                    this.handleUtf8LoadDataCommand(user, loadDataRealmId, loadDataEntityName);
-                }
+                this.executeUtf8Operation(user, LoadDataOperation, command, message);
                 break;
 
             case '>':
-                let saveDataFragment = command.substring(1);
-                if (saveDataFragment.length > 0) {
-                    let saveDataCommaIndex = saveDataFragment?.indexOf(',') ?? -1;
-                    let saveDataEntityName = saveDataCommaIndex === -1 ? saveDataFragment : saveDataFragment.substring(0, saveDataCommaIndex);
-                    let saveDataExpireTime = saveDataCommaIndex === -1 ? 0 : parseInt(saveDataFragment.substring(saveDataCommaIndex + 1));
-                    this.handleUtf8SaveDataCommand(user, saveDataEntityName, saveDataExpireTime, message);
-                }
+                this.executeUtf8Operation(user, SaveDataOperation, command, message);
                 break;
         }
     }
@@ -132,7 +127,7 @@ export default class RelayManager implements IRelayManager {
         const command = reader.readByte();
         const commandName = binaryServerCommandNames.get(command) ?? command;
         if (this.config.logIncoming) {
-            console.log(`[${userId}:${realmId === -1 ? '?' : realmId}|Binary|In] ${commandName} (${packet.length - 1} bytes)`);
+            console.log(`[${user.name ?? userId}:${realmId === -1 ? '?' : realmId}|Binary|In] ${commandName} (${packet.length - 1} bytes)`);
         }
 
         switch (commandName) {
@@ -163,35 +158,11 @@ export default class RelayManager implements IRelayManager {
         }
     }
 
-    private handleUtf8LoadDataCommand(senderUser: RelayUser, realmId: number, entityName: string): void {
-        if (senderUser.realm === null) {
-            return;
-        }
-        if (realmId === -1) {
-            realmId = senderUser.realm.id;
-        }
-        let fragment = realmId === senderUser.realm.id ? entityName : realmId + ',' + entityName;
-        let data = this.entityManager.loadData(realmId, entityName);
-        if (data === '') {
-            this.sendUtf8(senderUser, `<${fragment}`);
-        } else {
-            this.sendUtf8(senderUser, `<${fragment} ${data}`);
-        }
-    }
-
-    private handleUtf8SaveDataCommand(senderUser: RelayUser, entityName: string, time: number, data: string): void {
-        if (senderUser.realm === null) {
-            return;
-        }
-        this.entityManager.saveData(senderUser.realm.id, entityName, time, data);
-    }
-
     private handleBinFseListenCommand(senderUser: RelayUser, entityName: string): void {
         if (senderUser.realm === null) {
             return;
         }
 
-        console.log(`[${senderUser.id}|${senderUser.realm.id}:FSE|Listen] ${entityName}`);
         this.fseManager.subscribeUser(senderUser, entityName);
 
         const data = this.fseManager.getData(senderUser.realm.id, entityName);
@@ -208,7 +179,6 @@ export default class RelayManager implements IRelayManager {
             return;
         }
 
-        console.log(`[${senderUser.id}|${senderUser.realm.id}:FSE|Unlisten] ${entityName}`);
         this.fseManager.unsubscribeUser(senderUser, entityName);
     }
 
@@ -267,6 +237,14 @@ export default class RelayManager implements IRelayManager {
         return this.availableRealmIds.length > 0
             ? this.availableRealmIds.shift()
             : this.nextRealmId++;
+    }
+
+    public loadData(realmId: number, entityName: string): string {
+        return this.entityManager.loadData(realmId, entityName);
+    }
+
+    public saveData(realmId: number, entityName: string, expireTime: number, data: string): void {
+        this.entityManager.saveData(realmId, entityName, expireTime, data);
     }
 
     /**
@@ -377,7 +355,7 @@ export default class RelayManager implements IRelayManager {
 
     public sendUtf8(user: RelayUser, packet: string) {
         if (this.config.logOutgoing) {
-            console.log(`[${user.id}|Out] ${packet}`);
+            console.log(`[${user.name ?? user.id}|Out] ${packet}`);
         }
         user.connection.sendUTF(packet);
     }
@@ -386,7 +364,7 @@ export default class RelayManager implements IRelayManager {
         if (this.config.logOutgoing) {
             const command = packet?.[0] ?? -1;
             const commandName = binaryClientCommandNames.get(command) ?? command;
-            console.log(`[${user.id}|Out] ${commandName} (${packet.length - 1} bytes)`);
+            console.log(`[${user.name ?? user.id}|Out] ${commandName} (${packet.length - 1} bytes)`);
         }
         user.connection.sendBytes(packet);
     }

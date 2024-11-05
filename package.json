@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@types/websocket": "^1.0.5",
+    "jose": "^5.9.6",
     "websocket": "^1.0.34"
   },
   "devDependencies": {

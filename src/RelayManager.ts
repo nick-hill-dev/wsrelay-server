@@ -2,11 +2,10 @@ import { connection } from "websocket";
 import RelayRealm from "./RelayRealm";
 import RelayUser from "./RelayUser";
 import EntityManager from "./Entities/EntityManager";
-import { BinaryPacketWriter } from "./BinaryPacketWriter";
 import { BinaryPacketReader } from "./BinaryPacketReader";
 import FseManager from "./Entities/FseManager";
-import { binaryServerCommandNames } from "./BinaryServerCommandName";
-import { binaryClientCommandNames, binaryClientCommandNumbers } from "./BinaryClientCommandName";
+import { BinaryServerCommandNames, BinaryServerCommandNumber } from "./BinaryServerCommandName";
+import { BinaryClientCommandNames, BinaryClientCommandNumber } from "./BinaryClientCommandName";
 import { IUtf8Operation } from "./Operations/IUtf8Operation";
 import { JoinRealmOperation } from "./Operations/JoinRealmOperation";
 import { IRelayManager } from "./IRelayManager";
@@ -16,6 +15,11 @@ import { SendToRealmOperation } from "./Operations/SendToRealmOperation";
 import { IdentifyOperation } from "./Operations/IdentifyOperation";
 import { LoadDataOperation } from "./Operations/LoadDataOperation";
 import { SaveDataOperation } from "./Operations/SaveDataOperation";
+import { IBinaryOperation } from "./Operations/IBinaryOperation";
+import { FseListenOperation } from "./Operations/FseListenOperation";
+import { FseUnlistenOperation } from "./Operations/FseUnlistenOperation";
+import { FseSetOperation } from "./Operations/FseSetOperation";
+import { FseUpdateOperation } from "./Operations/FseUpdateOperation";
 
 export default class RelayManager implements IRelayManager {
 
@@ -33,7 +37,7 @@ export default class RelayManager implements IRelayManager {
 
     private readonly fseManager: FseManager = null;
 
-    public constructor(public readonly config: IConfig) {
+    public constructor(private readonly config: IConfig) {
         this.nextRealmId = config.publicRealmCount;
         this.entityManager = new EntityManager(config.entityPath);
         this.fseManager = new FseManager(config.fsePath, config.fseMaxSize ?? 131072);
@@ -124,104 +128,34 @@ export default class RelayManager implements IRelayManager {
 
         const realmId = user.realm ? user.realm.id : -1;
         const reader = new BinaryPacketReader(packet);
-        const command = reader.readByte();
-        const commandName = binaryServerCommandNames.get(command) ?? command;
+        const command = <BinaryServerCommandNumber>reader.readByte();
+        const commandName = BinaryServerCommandNames.get(command);
+        if (!commandName) {
+            return;
+        }
+
         if (this.config.logIncoming) {
             console.log(`[${user.name ?? userId}:${realmId === -1 ? '?' : realmId}|Binary|In] ${commandName} (${packet.length - 1} bytes)`);
         }
 
         switch (commandName) {
             case 'fseListen':
-                const fseListenName = reader.readString(1);
-                this.handleBinFseListenCommand(user, fseListenName);
+                this.executeBinaryOperation(user, FseListenOperation, command, reader);
                 break;
 
             case 'fseUnlisten':
-                const fseUnlistenName = reader.readString(1);
-                this.handleBinFseUnlistenCommand(user, fseUnlistenName);
+                this.executeBinaryOperation(user, FseUnlistenOperation, command, reader);
                 break;
 
             case 'fseSet':
             case 'fseSetIncludeMe':
-                const fseSetName = reader.readString(1);
-                const fseSetBytes = reader.readBuffer(4);
-                this.handleBinFseSetCommand(user, fseSetName, fseSetBytes, commandName === 'fseSetIncludeMe');
+                this.executeBinaryOperation(user, FseSetOperation, command, reader);
                 break;
 
             case 'fseUpdate':
             case 'fseUpdateIncludeMe':
-                const fseUpdateName = reader.readString(1);
-                const fseUpdateStart = reader.readUint32();
-                const fseUpdateBytes = reader.readBuffer(2);
-                this.handleBinFseUpdateCommand(user, fseUpdateName, fseUpdateStart, fseUpdateBytes, commandName === 'fseUpdateIncludeMe');
+                this.executeBinaryOperation(user, FseUpdateOperation, command, reader);
                 break;
-        }
-    }
-
-    private handleBinFseListenCommand(senderUser: RelayUser, entityName: string): void {
-        if (senderUser.realm === null) {
-            return;
-        }
-
-        this.fseManager.subscribeUser(senderUser, entityName);
-
-        const data = this.fseManager.getData(senderUser.realm.id, entityName);
-
-        const packet = new BinaryPacketWriter();
-        packet.writeByte(binaryClientCommandNumbers.get('fseData'));
-        packet.writeString(entityName);
-        packet.writeBuffer(data);
-        this.sendBinary(senderUser, packet.toBuffer());
-    }
-
-    private handleBinFseUnlistenCommand(senderUser: RelayUser, entityName: string): void {
-        if (senderUser.realm === null) {
-            return;
-        }
-
-        this.fseManager.unsubscribeUser(senderUser, entityName);
-    }
-
-    private handleBinFseSetCommand(senderUser: RelayUser, entityName: string, data: Buffer, includeSender: boolean): void {
-        if (senderUser.realm === null) {
-            return;
-        }
-
-        const subscribedUsers = this.fseManager.setData(senderUser.realm.id, entityName, data);
-
-        const packet = new BinaryPacketWriter();
-        packet.writeByte(binaryClientCommandNumbers.get('fseSet'));
-        packet.writeUint32(senderUser.id);
-        packet.writeString(entityName);
-        packet.writeBuffer(data);
-        const packetAsBuffer = packet.toBuffer();
-
-        for (const realmUser of subscribedUsers) {
-            if (includeSender || realmUser.id !== senderUser.id) {
-                this.sendBinary(realmUser, packetAsBuffer);
-            }
-        }
-    }
-
-    private handleBinFseUpdateCommand(senderUser: RelayUser, name: string, start: number, data: Buffer, includeSender: boolean): void {
-        if (senderUser.realm === null) {
-            return;
-        }
-
-        const subscribedUsers = this.fseManager.updateData(senderUser.realm.id, name, start, data);
-
-        const packet = new BinaryPacketWriter();
-        packet.writeByte(binaryClientCommandNumbers.get('fseUpdate'));
-        packet.writeUint32(senderUser.id);
-        packet.writeString(name);
-        packet.writeUint32(start);
-        packet.writeBuffer(data);
-        const packetAsBuffer = packet.toBuffer();
-
-        for (let realmUser of subscribedUsers) {
-            if (includeSender || realmUser.id !== senderUser.id) {
-                this.sendBinary(realmUser, packetAsBuffer);
-            }
         }
     }
 
@@ -239,12 +173,16 @@ export default class RelayManager implements IRelayManager {
             : this.nextRealmId++;
     }
 
-    public loadData(realmId: number, entityName: string): string {
-        return this.entityManager.loadData(realmId, entityName);
+    public getConfig(): IConfig {
+        return this.config;
     }
 
-    public saveData(realmId: number, entityName: string, expireTime: number, data: string): void {
-        this.entityManager.saveData(realmId, entityName, expireTime, data);
+    public getEntityManager(): EntityManager {
+        return this.entityManager;
+    }
+
+    public getFseManager(): FseManager {
+        return this.fseManager;
     }
 
     /**
@@ -360,16 +298,22 @@ export default class RelayManager implements IRelayManager {
         user.connection.sendUTF(packet);
     }
 
-    private sendBinary(user: RelayUser, packet: Buffer) {
+    public sendBinary(user: RelayUser, packet: Buffer) {
         if (this.config.logOutgoing) {
             const command = packet?.[0] ?? -1;
-            const commandName = binaryClientCommandNames.get(command) ?? command;
+            const commandName = BinaryClientCommandNames.get(<BinaryClientCommandNumber>command) ?? command;
             console.log(`[${user.name ?? user.id}|Out] ${commandName} (${packet.length - 1} bytes)`);
         }
         user.connection.sendBytes(packet);
     }
 
     private executeUtf8Operation(user: RelayUser, operationType: { new(): IUtf8Operation }, command: string, message: string) {
+        const operation = new operationType();
+        operation.decode(command, message);
+        operation.execute(user, this);
+    }
+
+    private executeBinaryOperation(user: RelayUser, operationType: { new(): IBinaryOperation }, command: BinaryServerCommandNumber, message: BinaryPacketReader) {
         const operation = new operationType();
         operation.decode(command, message);
         operation.execute(user, this);

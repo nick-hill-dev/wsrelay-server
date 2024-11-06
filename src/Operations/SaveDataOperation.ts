@@ -37,7 +37,9 @@ export class SaveDataOperation implements IUtf8Operation {
         if (senderUser.realm === null) {
             return;
         }
-        manager.saveData(senderUser.realm.id, this.entityName, this.expireTime, this.data);
+
+        const entityManager = manager.getEntityManager();
+        entityManager.saveData(senderUser.realm.id, this.entityName, this.expireTime, this.data);
     }
 
 }

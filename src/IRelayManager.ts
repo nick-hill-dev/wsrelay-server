@@ -1,9 +1,11 @@
+import EntityManager from "./Entities/EntityManager";
+import FseManager from "./Entities/FseManager";
 import RelayRealm from "./RelayRealm";
 import RelayUser from "./RelayUser";
 
 export interface IRelayManager {
 
-    readonly config: IConfig;
+    getConfig(): IConfig;
 
     getUserById(userId: number): RelayUser;
 
@@ -13,10 +15,12 @@ export interface IRelayManager {
 
     changeRealm(user: RelayUser, targetRealmId: number, createChildRealm: boolean): void;
 
+    getEntityManager(): EntityManager;
+
+    getFseManager(): FseManager;
+
     sendUtf8(user: RelayUser, packet: string): void;
 
-    loadData(realmId: number, entityName: string): string;
-
-    saveData(realmId: number, entityName: string, expireTime: number, data: string): void;
+    sendBinary(user: RelayUser, packet: Buffer): void;
 
 }

@@ -41,7 +41,7 @@ export class IdentifyOperation implements IUtf8Operation {
         }
 
         if (this.type === 'jwt') {
-            const jwtConfig = manager.config.jwt;
+            const jwtConfig = manager.getConfig().jwt;
             if (!jwtConfig) {
                 throw new Error('JWT config is not defined.');
             }
@@ -67,7 +67,6 @@ export class IdentifyOperation implements IUtf8Operation {
                     senderUser.name = jwtConfig.nameClaim ? <string>jwt[jwtConfig.nameClaim] : jwt.sub;
                 }
             })();
-
 
         }
 

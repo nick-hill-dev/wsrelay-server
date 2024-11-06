@@ -42,7 +42,8 @@ export class LoadDataOperation implements IUtf8Operation {
             ? this.entityName
             : realmId + ',' + this.entityName;
 
-        let data = manager.loadData(realmId, this.entityName);
+        const entityManager = manager.getEntityManager();
+        const data = entityManager.loadData(realmId, this.entityName);
         if (data === '') {
             manager.sendUtf8(senderUser, `<${fragment}`);
         } else {

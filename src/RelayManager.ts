@@ -20,6 +20,7 @@ import { FseListenOperation } from "./Operations/FseListenOperation";
 import { FseUnlistenOperation } from "./Operations/FseUnlistenOperation";
 import { FseSetOperation } from "./Operations/FseSetOperation";
 import { FseUpdateOperation } from "./Operations/FseUpdateOperation";
+import { NewRealmOption } from "./NewRealmOption";
 
 export default class RelayManager implements IRelayManager {
 
@@ -59,7 +60,7 @@ export default class RelayManager implements IRelayManager {
         if (!user) {
             return;
         }
-        this.changeRealm(user, -1, false);
+        this.changeRealm(user, -1, 'standard');
         this.availableUserIds.push(userId);
         this.users[userId] = undefined;
     }
@@ -187,9 +188,9 @@ export default class RelayManager implements IRelayManager {
 
     /**
      * @param targetRealmId The target realm number, or -1 to leave a realm.
-     * @param createChildRealm Indicates whether a request has been made to join a child realm (note targetRealmId will not be -1 in this case).
+     * @param option If the realm should become a child realm of the user's current realm, targetRealmId must not be -1.
      */
-    public changeRealm(user: RelayUser, targetRealmId: number, createChildRealm: boolean) {
+    public changeRealm(user: RelayUser, targetRealmId: number, option: NewRealmOption) {
 
         // Don't do anything if the user is staying in the same realm
         let becomingRealmless = targetRealmId === -1;
@@ -199,95 +200,35 @@ export default class RelayManager implements IRelayManager {
 
         // Child realms can only be created if user is currently in a realm
         let oldRealm = user.realm;
-        if (oldRealm === null && createChildRealm) {
-            createChildRealm = false;
+        let makeChild = option === 'temporaryChildRealm' || option === 'persistedChildRealm';
+        if (oldRealm === null && makeChild) {
+            option = 'standard';
+            makeChild = false;
         }
 
-        // Unlisten to all FSEs from the old realm
+        // Remove user from the old realm
         if (oldRealm !== null) {
-            this.fseManager.unsubscribeUserFromAll(user);
+            this.makeUserLeaveRealm(user, oldRealm);
         }
 
-        // Remove user from the old realm, informing everyone that the user has left it
-        if (oldRealm !== null) {
-            oldRealm.users.splice(oldRealm.users.indexOf(user), 1);
-            user.realm = null;
-            for (let realmUser of oldRealm.users) {
-                this.sendUtf8(realmUser, `-${user.id}`);
-            }
-        }
-
-        // Get the target realm, creating it if necessary
+        // Add the user to the new realm, creating it if necessary
         let newRealm: RelayRealm = null;
         let creatingOrJoiningRealm = targetRealmId !== -1;
         if (creatingOrJoiningRealm) {
-            newRealm = this.realms[targetRealmId];
-            if (!newRealm) {
-                let parentRealm = createChildRealm ? oldRealm : null;
-                newRealm = new RelayRealm(parentRealm, targetRealmId);
-                this.realms[targetRealmId] = newRealm;
-                if (parentRealm !== null) {
-                    parentRealm.childRealms.push(newRealm);
-                }
-            }
-
-            // Add the user to the new realm
-            newRealm.users.push(user);
-            user.realm = newRealm;
-
-            // Advise user that the new realm has been joined successfully
-            this.sendUtf8(user, `${createChildRealm ? "&" : "^"}${targetRealmId}`);
-
-            // Advise user of all child realms already existing in the new realm
-            for (let realm of newRealm.childRealms) {
-                this.sendUtf8(user, `{${realm.id}`);
-            }
-
-            // Advise user of all other users already connected to that realm
-            let otherRealmUsers = newRealm.users.filter(u => u !== user);
-            this.sendUtf8(user, `=${otherRealmUsers.map(u => u.id).join(',')}`);
-
-            // Advise everyone in the target realm that user has joined
-            for (let realmUser of otherRealmUsers) {
-                this.sendUtf8(realmUser, `+${user.id}`);
-            }
+            newRealm = this.realms[targetRealmId] ?? this.createRealm(targetRealmId, makeChild ? oldRealm : null);
+            this.makeUserJoinRealm(user, newRealm, makeChild);
         }
 
         // Advise everyone in the old realm that there is a new child realm
-        if (createChildRealm) {
+        if (makeChild) {
             for (let realmUser of oldRealm.users) {
                 this.sendUtf8(realmUser, `{${newRealm.id}`);
             }
         }
 
         // If there aren't any more users or child realms in the old realm then recursively destroy the old realm(s)
-        let currentRealm = oldRealm;
-        while (!createChildRealm && currentRealm !== null && currentRealm.users.length === 0 && currentRealm.childRealms.length === 0) {
-
-            // Remove the realm from the parent's child list
-            if (currentRealm.parentRealm !== null) {
-                currentRealm.parentRealm.childRealms.splice(currentRealm.parentRealm.childRealms.indexOf(currentRealm), 1);
-
-                // Advise users of the parent realm that the child realm has been destroyed
-                for (let realmUser of currentRealm.parentRealm.users) {
-                    this.sendUtf8(realmUser, `}${currentRealm.id}`);
-                }
-            }
-
-            // Remove realm data
-            if (currentRealm.id >= this.config.publicRealmCount) {
-                this.entityManager.handleRealmDeleted(currentRealm.id);
-                this.fseManager.handleRealmDeleted(currentRealm.id);
-            }
-
-            // Remove the realm from the list
-            if (currentRealm.id >= this.config.publicRealmCount) {
-                this.availableRealmIds.push(currentRealm.id);
-            }
-            this.availableRealmIds.splice(this.availableRealmIds.indexOf(currentRealm.id), 1);
-
-            // Move on to checking parent realm
-            currentRealm = currentRealm.parentRealm;
+        if (!makeChild) {
+            this.cleanUpEmptyRealms(oldRealm);
         }
     }
 
@@ -317,6 +258,85 @@ export default class RelayManager implements IRelayManager {
         const operation = new operationType();
         operation.decode(command, message);
         operation.execute(user, this);
+    }
+
+    private createRealm(id: number, parentRealm: RelayRealm): RelayRealm {
+        const newRealm = new RelayRealm(parentRealm, id);
+        this.realms[id] = newRealm;
+        if (parentRealm !== null) {
+            parentRealm.childRealms.push(newRealm);
+        }
+        return newRealm;
+    }
+
+    private makeUserLeaveRealm(user: RelayUser, realmToLeave: RelayRealm): void {
+
+        // Unlisten to all FSEs from the old realm
+        this.fseManager.unsubscribeUserFromAll(user);
+
+        // Remove user from the realm
+        realmToLeave.users.splice(realmToLeave.users.indexOf(user), 1);
+        user.realm = null;
+
+        // Notify everyone else
+        for (let realmUser of realmToLeave.users) {
+            this.sendUtf8(realmUser, `-${user.id}`);
+        }
+    }
+
+    private makeUserJoinRealm(user: RelayUser, realmToJoin: RelayRealm, asChild: boolean): void {
+
+        // Add user to the realm
+        realmToJoin.users.push(user);
+        user.realm = realmToJoin;
+
+        // Advise user that the new realm has been joined successfully
+        this.sendUtf8(user, `${asChild ? "&" : "^"}${realmToJoin.id}`);
+
+        // Advise user of all child realms already existing in the new realm
+        for (let realm of realmToJoin.childRealms) {
+            this.sendUtf8(user, `{${realm.id}`);
+        }
+
+        // Advise user of all other users already connected to that realm
+        let otherRealmUsers = realmToJoin.users.filter(u => u !== user);
+        this.sendUtf8(user, `=${otherRealmUsers.map(u => u.id).join(',')}`);
+
+        // Advise everyone in the target realm that user has joined
+        for (let realmUser of otherRealmUsers) {
+            this.sendUtf8(realmUser, `+${user.id}`);
+        }
+    }
+
+    private cleanUpEmptyRealms(realm: RelayRealm) {
+        let currentRealm = realm;
+        while (currentRealm !== null && currentRealm.users.length === 0 && currentRealm.childRealms.length === 0) {
+
+            // Remove the realm from the parent's child list
+            if (currentRealm.parentRealm !== null) {
+                currentRealm.parentRealm.childRealms.splice(currentRealm.parentRealm.childRealms.indexOf(currentRealm), 1);
+
+                // Advise users of the parent realm that the child realm has been destroyed
+                for (let realmUser of currentRealm.parentRealm.users) {
+                    this.sendUtf8(realmUser, `}${currentRealm.id}`);
+                }
+            }
+
+            // Remove realm data
+            if (currentRealm.id >= this.config.publicRealmCount) {
+                this.entityManager.handleRealmDeleted(currentRealm.id);
+                this.fseManager.handleRealmDeleted(currentRealm.id);
+            }
+
+            // Remove the realm from the list
+            if (currentRealm.id >= this.config.publicRealmCount) {
+                this.availableRealmIds.push(currentRealm.id);
+            }
+            this.availableRealmIds.splice(this.availableRealmIds.indexOf(currentRealm.id), 1);
+
+            // Move on to checking parent realm
+            currentRealm = currentRealm.parentRealm;
+        }
     }
 
 }

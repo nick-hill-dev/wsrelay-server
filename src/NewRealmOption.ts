@@ -1,0 +1,1 @@
+export type NewRealmOption = 'standard' | 'temporaryChildRealm' | 'persistedChildRealm';

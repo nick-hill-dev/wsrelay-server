@@ -1,5 +1,6 @@
 import EntityManager from "./Entities/EntityManager";
 import FseManager from "./Entities/FseManager";
+import { NewRealmOption } from "./NewRealmOption";
 import RelayRealm from "./RelayRealm";
 import RelayUser from "./RelayUser";
 
@@ -13,7 +14,7 @@ export interface IRelayManager {
 
     reserveNextAvailableRealmNumber(): number;
 
-    changeRealm(user: RelayUser, targetRealmId: number, createChildRealm: boolean): void;
+    changeRealm(user: RelayUser, targetRealmId: number, option: NewRealmOption): void;
 
     getEntityManager(): EntityManager;
 

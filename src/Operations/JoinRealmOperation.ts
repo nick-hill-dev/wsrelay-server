@@ -34,7 +34,8 @@ export class JoinRealmOperation implements IUtf8Operation {
         if (realmId === -1) {
             realmId = manager.reserveNextAvailableRealmNumber();
         }
-        manager.changeRealm(senderUser, realmId, this.mode === 'child');
+        const option = this.mode === 'child' ? 'temporaryChildRealm' : 'standard';
+        manager.changeRealm(senderUser, realmId, option);
     }
 
 }

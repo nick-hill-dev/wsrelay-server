@@ -17,10 +17,13 @@ Write-Host "> docker stop" -ForegroundColor Cyan
 Write-Host "> docker rm" -ForegroundColor Cyan
 & docker -H containers rm $Name
 
+# Note: This mounts a config directory and effectively replaces the default config.json in the image.
+# You will need to supply your own config file in the mounted config directory!
 Write-Host "> docker run" -ForegroundColor Cyan
 & docker -H containers run -d `
     --restart=always `
     --name $Name `
+    -v /var/dockerVolumes/wsrelay/config:/usr/src/app/config `
     -v /var/dockerVolumes/wsrelay/data:/usr/src/app/data `
     -p 22002:22002 `
     hccr.nick-hill.com/$($Name):latest

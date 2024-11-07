@@ -11,6 +11,8 @@ New-Item -ItemType Directory -Path $targetPath -ErrorAction SilentlyContinue | O
 
 Copy-Item "bin/*" $targetPath
 
-Copy-Item "config.json" $targetPath
+New-Item -ItemType Directory -Path "$targetPath/config" -ErrorAction SilentlyContinue | Out-Null
+
+Copy-Item "config/*" "$targetPath/config"
 
 New-Item -ItemType Directory -Path "$targetPath/data" -ErrorAction SilentlyContinue | Out-Null

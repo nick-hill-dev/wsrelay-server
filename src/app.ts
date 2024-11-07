@@ -29,7 +29,7 @@ let server = http.createServer((request: any, response: any) => {
 });
 
 server.listen(config.port, () => {
-    console.log('WebSocket Relay Server. Version 2.0 written by Nicholas Hill.');
+    console.log('WebSocket Relay Server. Version 2.1 written by Nicholas Hill.');
     console.log('Connections will be accepted from the following origins: ' + config.acceptedOrigins.join(', '));
     console.log('Connections will be accepted for the following protocols: ' + config.acceptedProtocols.join(', '));
     console.log(`Listening on port ${config.port}.`);

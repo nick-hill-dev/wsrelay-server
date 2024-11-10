@@ -192,6 +192,8 @@ export default class RelayManager implements IRelayManager {
      */
     public changeRealm(user: RelayUser, targetRealmId: number, option: NewRealmOption) {
 
+        // TODO: Need to test joining/leaving realms and ensure things work and all the messages are sent in the correct order
+        
         // Don't do anything if the user is staying in the same realm
         let becomingRealmless = targetRealmId === -1;
         if ((user.realm === null && becomingRealmless) || (user.realm !== null && user.realm.id === targetRealmId)) {

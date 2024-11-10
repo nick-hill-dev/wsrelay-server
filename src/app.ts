@@ -40,9 +40,10 @@ server.listen(config.port, () => {
     }
 });
 
-let wsServer: WSServer = new WebSocketServer({
+let wsServer = new WSServer({
     httpServer: server,
-    autoAcceptConnections: false
+    autoAcceptConnections: false,
+    maxReceivedFrameSize: Math.max(64 * 1024, config.fseMaxSize)
 });
 
 wsServer.on('request', (request) => {

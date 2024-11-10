@@ -7,6 +7,8 @@ export class Fse {
 
     private length: number;
 
+    private changed: boolean = false;
+
     private readonly subscribedUsers: RelayUser[] = [];
 
     public constructor(
@@ -16,6 +18,7 @@ export class Fse {
         if (initialData) {
             this.buffer = initialData;
             this.length = initialData.length;
+            this.changed = true;
         } else {
             this.buffer = new Uint8Array(128);
             this.length = 0;
@@ -28,6 +31,7 @@ export class Fse {
             this.expandBuffer(requiredLength);
         }
         this.buffer.set(bytes, position);
+        this.changed = true;
         if (this.length < requiredLength) {
             this.length = requiredLength;
         }
@@ -59,18 +63,21 @@ export class Fse {
             return new Fse(fileName);
         }
         const data = fs.readFileSync(fileName);
-        return new Fse(fileName, data);
+        const fse = new Fse(fileName, data);
+        fse.changed = false;
+        return fse;
     }
 
     public save(): boolean {
-        const bytes = this.toUint8Array();
-        if (bytes.length === 0) {
+        if (this.length === 0) {
             if (fs.existsSync(this.fileName)) {
                 fs.unlinkSync(this.fileName);
             }
             return false;
-        } else {
+        } else if (this.changed) {
+            const bytes = this.toUint8Array();
             fs.writeFileSync(this.fileName, bytes);
+            this.changed = false;
             return true;
         }
     }

@@ -36,6 +36,10 @@ export default class FseManager {
         const fse = this.getOrCreateFse(realmId, entityName);
         fse.setBytes(0, data);
 
+        if (!fs.existsSync(fse.fileName)) {
+            fse.save();
+        }
+
         return fse.getSubscribedUsers();
     }
 

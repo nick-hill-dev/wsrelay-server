@@ -3,11 +3,9 @@
 import './IConfig';
 import RelayManager from './RelayManager';
 import { connection, request, server as WSServer } from 'websocket';
-
-let WebSocketServer = require('websocket').server;
-let http = require('http');
-
+import * as http from 'http';
 import fs from 'fs';
+
 let configText = fs.readFileSync('./config/config.json', 'utf8');
 let config = <IConfig>JSON.parse(configText);
 
@@ -22,7 +20,7 @@ if (!fs.existsSync(fsePath)) {
 
 let manager = new RelayManager(config);
 
-let server = http.createServer((request: any, response: any) => {
+let server = http.createServer((request, response) => {
     console.log(`Received request for: ${request.url}`);
     response.writeHead(404);
     response.end();

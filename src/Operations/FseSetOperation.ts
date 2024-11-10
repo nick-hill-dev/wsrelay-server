@@ -42,7 +42,7 @@ export class FseSetOperation implements IBinaryOperation {
         packet.writeByte(BinaryClientCommandNumbers.get('fseSet'));
         packet.writeUint32(senderUser.id);
         packet.writeString(this.name);
-        packet.writeBuffer(this.data);
+        packet.writeBuffer(this.data, 4);
         const packetAsBuffer = packet.toBuffer();
 
         for (const realmUser of subscribedUsers) {

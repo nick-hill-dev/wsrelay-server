@@ -30,7 +30,7 @@ export class FseListenOperation implements IBinaryOperation {
         const packet = new BinaryPacketWriter();
         packet.writeByte(BinaryClientCommandNumbers.get('fseData'));
         packet.writeString(this.name);
-        packet.writeBuffer(data);
+        packet.writeBuffer(data, 4);
         manager.sendBinary(senderUser, packet.toBuffer());
     }
 

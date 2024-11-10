@@ -3,3 +3,4 @@ node_modules
 build
 data/*.e
 data/*.fse
+config/config.json

@@ -10,8 +10,8 @@ If (-not (Test-Path "node_modules")) {
     & npm install
 }
 
-Write-Host "> tsc build" -ForegroundColor Cyan
-& tsc -b
+Write-Host "> npm run build" -ForegroundColor Cyan
+& npm run build
 
 If ($Run -and -not $Docker) {
     Write-Host "> node run" -ForegroundColor Cyan

@@ -9,9 +9,10 @@ Web pages that make use of a WebSocket Relay server must understand and transmit
 1. Prepare Development Environment: `npm install`
 1. Run with `npm start`
 
-Alternatively, instead of using `npx` and `ts-node` you can build via TypeScript and run directly:
+Alternatively, instead of using `npm start` (which uses `npx` and `ts-node` internally), you can build via TypeScript and run directly:
 
 ```bash
+cp ./config/defaultConfig.json ./config/config.json
 tsc -b
 node bin/app.js
 ```

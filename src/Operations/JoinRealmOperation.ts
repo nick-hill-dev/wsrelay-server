@@ -42,6 +42,7 @@ export class JoinRealmOperation implements IUtf8Operation {
         }
         let option: NewRealmOption = 'standard';
         if (this.mode === 'child') {
+            // TODO: If server restarts it forgets about which realm should be the next number, and seems to re-use existing/active realms
             option = this.persist ? 'persistedChildRealm' : 'temporaryChildRealm';
         }
         manager.changeRealm(senderUser, realmId, option);

@@ -226,7 +226,7 @@ export default class RelayManager implements IRelayManager {
         if (creatingOrJoiningRealm) {
             newRealm = existingRealm;
             if (!newRealm) {
-                this.createRealm(targetRealmId, makeChild ? oldRealm : null, persist);
+                newRealm = this.createRealm(targetRealmId, makeChild ? oldRealm : null, persist);
                 if (persist) {
                     this.savePersistedRealms();
                 }

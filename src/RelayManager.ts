@@ -21,16 +21,18 @@ import { FseUnlistenOperation } from "./Operations/FseUnlistenOperation";
 import { FseSetOperation } from "./Operations/FseSetOperation";
 import { FseUpdateOperation } from "./Operations/FseUpdateOperation";
 import { NewRealmOption } from "./NewRealmOption";
+import fs from 'fs';
+import { RealmTree } from "./RealmTree";
 
 export default class RelayManager implements IRelayManager {
 
     public readonly users: RelayUser[] = [];
 
-    private readonly availableUserIds: number[] = [];
+    private readonly availableUserIds: number[] = []; // TODO: Are these actually used if users leave?
 
     public readonly realms: RelayRealm[] = [];
 
-    private readonly availableRealmIds: number[] = [];
+    private readonly availableRealmIds: number[] = []; // TODO: Are these actually used if realms are destroyed?
 
     private nextRealmId: number = 0;
 
@@ -42,13 +44,14 @@ export default class RelayManager implements IRelayManager {
         this.nextRealmId = config.publicRealmCount;
         this.entityManager = new EntityManager(config.entityPath);
         this.fseManager = new FseManager(config.fsePath, config.fseMaxSize ?? 131072);
+        this.loadPersistedRealms();
     }
 
     public registerUser(connection: connection): number {
         let userId = this.users.length;
         if (this.availableUserIds.length > 0) {
             userId = this.availableUserIds.shift();
-            this.availableUserIds.sort();
+            this.availableUserIds.sort((a, b) => (a - b));
         }
         let user = new RelayUser(userId, connection);
         this.users[userId] = user;
@@ -87,6 +90,7 @@ export default class RelayManager implements IRelayManager {
         switch (command[0]) {
             case '^':
             case '&':
+            case '%':
                 this.executeUtf8Operation(user, JoinRealmOperation, command, message);
                 break;
 
@@ -193,7 +197,7 @@ export default class RelayManager implements IRelayManager {
     public changeRealm(user: RelayUser, targetRealmId: number, option: NewRealmOption) {
 
         // TODO: Need to test joining/leaving realms and ensure things work and all the messages are sent in the correct order
-        
+
         // Don't do anything if the user is staying in the same realm
         let becomingRealmless = targetRealmId === -1;
         if ((user.realm === null && becomingRealmless) || (user.realm !== null && user.realm.id === targetRealmId)) {
@@ -203,9 +207,11 @@ export default class RelayManager implements IRelayManager {
         // Child realms can only be created if user is currently in a realm
         let oldRealm = user.realm;
         let makeChild = option === 'temporaryChildRealm' || option === 'persistedChildRealm';
+        let persist = option === 'persistedChildRealm';
         if (oldRealm === null && makeChild) {
             option = 'standard';
             makeChild = false;
+            persist = false;
         }
 
         // Remove user from the old realm
@@ -214,15 +220,22 @@ export default class RelayManager implements IRelayManager {
         }
 
         // Add the user to the new realm, creating it if necessary
+        const existingRealm = this.realms[targetRealmId];
         let newRealm: RelayRealm = null;
         let creatingOrJoiningRealm = targetRealmId !== -1;
         if (creatingOrJoiningRealm) {
-            newRealm = this.realms[targetRealmId] ?? this.createRealm(targetRealmId, makeChild ? oldRealm : null);
+            newRealm = existingRealm;
+            if (!newRealm) {
+                this.createRealm(targetRealmId, makeChild ? oldRealm : null, persist);
+                if (persist) {
+                    this.savePersistedRealms();
+                }
+            }
             this.makeUserJoinRealm(user, newRealm, makeChild);
         }
 
         // Advise everyone in the old realm that there is a new child realm
-        if (makeChild) {
+        if (makeChild && !existingRealm) {
             for (let realmUser of oldRealm.users) {
                 this.sendUtf8(realmUser, `{${newRealm.id}`);
             }
@@ -262,8 +275,8 @@ export default class RelayManager implements IRelayManager {
         operation.execute(user, this);
     }
 
-    private createRealm(id: number, parentRealm: RelayRealm): RelayRealm {
-        const newRealm = new RelayRealm(parentRealm, id);
+    private createRealm(id: number, parentRealm: RelayRealm, persist: boolean): RelayRealm {
+        const newRealm = new RelayRealm(parentRealm, id, persist);
         this.realms[id] = newRealm;
         if (parentRealm !== null) {
             parentRealm.childRealms.push(newRealm);
@@ -312,7 +325,7 @@ export default class RelayManager implements IRelayManager {
 
     private cleanUpEmptyRealms(realm: RelayRealm) {
         let currentRealm = realm;
-        while (currentRealm !== null && currentRealm.users.length === 0 && currentRealm.childRealms.length === 0) {
+        while (currentRealm !== null && currentRealm.users.length === 0 && currentRealm.childRealms.length === 0 && !currentRealm.persist) {
 
             // Remove the realm from the parent's child list
             if (currentRealm.parentRealm !== null) {
@@ -339,6 +352,56 @@ export default class RelayManager implements IRelayManager {
             // Move on to checking parent realm
             currentRealm = currentRealm.parentRealm;
         }
+    }
+
+    private loadPersistedRealms() {
+
+        const path = this.config.csvPath ?? this.config.entityPath;
+        const fileName = `${path}/realms.csv`;
+        if (fs.existsSync(fileName)) {
+            const csv = fs.readFileSync(fileName, 'utf8').split('\n');
+            const childParentMappings = new Map<number, number>();
+            for (let row of csv) {
+                const parts = row.split(',');
+                const id = parseInt(parts[0]);
+                const parentRealmId = parseInt(parts[1]);
+                childParentMappings.set(id, parentRealmId);
+            }
+
+            const tree = new Map<number, RealmTree>();
+            for (const childParentMapping of childParentMappings) {
+                const parentRealmId = childParentMapping[1];
+                if (!childParentMappings.get(parentRealmId)) {
+                    tree.set(parentRealmId, new RealmTree(parentRealmId, null, false));
+                }
+            }
+
+            for (const childParentMapping of childParentMappings) {
+                const id = childParentMapping[0];
+                const parentRealmId = childParentMapping[1];
+                const parentRealm = tree.get(parentRealmId);
+                if (!parentRealm.childRealms.find(r => r.id === id)) {
+                    parentRealm.childRealms.push(new RealmTree(id, parentRealm, true));
+                }
+            }
+
+            for (const rootRealm of tree.values()) {
+                for (const realmToCreate of rootRealm.enumerate()) {
+                    const parentRealmId = realmToCreate.parentRealm?.id ?? null;
+                    const parentRealmInstance = parentRealmId ? this.realms[parentRealmId] : null;
+                    this.createRealm(realmToCreate.id, parentRealmInstance, realmToCreate.persisted);
+                }
+            }
+        }
+    }
+
+    private savePersistedRealms() {
+        const path = this.config.csvPath ?? this.config.entityPath;
+        const csv = this.realms
+            .filter(r => r.parentRealm !== null && r.persist)
+            .map(r => `${r.id},${r.parentRealm.id}`)
+            .join('\n');
+        fs.writeFileSync(`${path}/realms.csv`, csv, 'utf8');
     }
 
 }

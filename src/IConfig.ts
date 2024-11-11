@@ -14,6 +14,8 @@ interface IConfig {
 
     fseMaxSize?: number;
 
+    csvPath?: string;
+
     logIncoming: boolean;
 
     logOutgoing: boolean;

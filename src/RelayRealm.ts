@@ -8,7 +8,8 @@ export default class RelayRealm {
 
     public constructor(
         public readonly parentRealm: RelayRealm,
-        public readonly id: number
+        public readonly id: number,
+        public readonly persist: boolean
     ) {
     }
 

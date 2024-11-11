@@ -1,10 +1,13 @@
 import { IRelayManager } from "../IRelayManager";
+import { NewRealmOption } from "../NewRealmOption";
 import RelayUser from "../RelayUser";
 import { IUtf8Operation } from "./IUtf8Operation";
 
 export class JoinRealmOperation implements IUtf8Operation {
 
     private mode: 'direct' | 'child';
+
+    private persist: boolean;
 
     private realmNumber: number;
 
@@ -13,10 +16,13 @@ export class JoinRealmOperation implements IUtf8Operation {
         switch (symbol) {
             case '^':
                 this.mode = 'direct';
+                this.persist = false;
                 break;
 
             case '&':
+            case '%':
                 this.mode = 'child';
+                this.persist = symbol === '%';
                 break;
 
             default:
@@ -34,7 +40,10 @@ export class JoinRealmOperation implements IUtf8Operation {
         if (realmId === -1) {
             realmId = manager.reserveNextAvailableRealmNumber();
         }
-        const option = this.mode === 'child' ? 'temporaryChildRealm' : 'standard';
+        let option: NewRealmOption = 'standard';
+        if (this.mode === 'child') {
+            option = this.persist ? 'persistedChildRealm' : 'temporaryChildRealm';
+        }
         manager.changeRealm(senderUser, realmId, option);
     }
 

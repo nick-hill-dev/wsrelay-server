@@ -23,6 +23,7 @@ import { FseUpdateOperation } from "./Operations/FseUpdateOperation";
 import { NewRealmOption } from "./NewRealmOption";
 import fs from 'fs';
 import { RealmTree } from "./RealmTree";
+import { DeleteRealmOperation } from "./Operations/DeleteRealmOperation";
 
 export default class RelayManager implements IRelayManager {
 
@@ -92,6 +93,10 @@ export default class RelayManager implements IRelayManager {
             case '&':
             case '%':
                 this.executeUtf8Operation(user, JoinRealmOperation, command, message);
+                break;
+
+            case 'x':
+                this.executeUtf8Operation(user, DeleteRealmOperation, command, message);
                 break;
 
             case '~':
@@ -244,6 +249,21 @@ export default class RelayManager implements IRelayManager {
         // If there aren't any more users or child realms in the old realm then recursively destroy the old realm(s)
         if (!makeChild) {
             this.cleanUpEmptyRealms(oldRealm);
+        }
+    }
+
+    public deleteRealm(realmId: number): void {
+        const realm = this.realms[realmId];
+        if (realm && realm.childRealms.length === 0) {
+            const wasPersisted = realm.persist;
+            realm.persist = false;
+            const newRealmId = realm.parentRealm?.id ?? -1;
+            for (const user of realm.users) {
+                this.changeRealm(user, newRealmId, 'standard');
+            }
+            if (wasPersisted) {
+                this.savePersistedRealms();
+            }
         }
     }
 

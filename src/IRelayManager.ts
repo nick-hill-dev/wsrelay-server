@@ -16,6 +16,8 @@ export interface IRelayManager {
 
     changeRealm(user: RelayUser, targetRealmId: number, option: NewRealmOption): void;
 
+    deleteRealm(realmId: number): void;
+
     getEntityManager(): EntityManager;
 
     getFseManager(): FseManager;

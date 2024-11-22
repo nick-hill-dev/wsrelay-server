@@ -24,48 +24,43 @@ import { NewRealmOption } from "./NewRealmOption";
 import fs from 'fs';
 import { RealmTree } from "./RealmTree";
 import { DeleteRealmOperation } from "./Operations/DeleteRealmOperation";
+import { IdAssigner } from "./IdAssigner";
 
 export default class RelayManager implements IRelayManager {
 
+    private readonly realmIds: IdAssigner;
+
+    private readonly userIds: IdAssigner = new IdAssigner(1);
+
     public readonly users: RelayUser[] = [];
 
-    private readonly availableUserIds: number[] = []; // TODO: Are these actually used if users leave?
-
     public readonly realms: RelayRealm[] = [];
-
-    private readonly availableRealmIds: number[] = []; // TODO: Are these actually used if realms are destroyed?
-
-    private nextRealmId: number = 0;
 
     private readonly entityManager: EntityManager = null;
 
     private readonly fseManager: FseManager = null;
 
     public constructor(private readonly config: IConfig) {
-        this.nextRealmId = config.publicRealmCount;
+        this.realmIds = new IdAssigner(config.publicRealmCount);
         this.entityManager = new EntityManager(config.entityPath);
         this.fseManager = new FseManager(config.fsePath, config.fseMaxSize ?? 131072);
         this.loadPersistedRealms();
     }
 
     public registerUser(connection: connection): number {
-        let userId = this.users.length;
-        if (this.availableUserIds.length > 0) {
-            userId = this.availableUserIds.shift();
-            this.availableUserIds.sort((a, b) => (a - b));
-        }
+        const userId = this.userIds.assign();
         let user = new RelayUser(userId, connection);
         this.users[userId] = user;
         return userId;
     }
 
     public unregisterUser(userId: number): void {
-        let user = this.users[userId];
+        const user = this.users[userId];
         if (!user) {
             return;
         }
         this.changeRealm(user, -1, 'standard');
-        this.availableUserIds.push(userId);
+        this.userIds.unassign(userId);
         this.users[userId] = undefined;
     }
 
@@ -178,9 +173,7 @@ export default class RelayManager implements IRelayManager {
     }
 
     public reserveNextAvailableRealmNumber(): number {
-        return this.availableRealmIds.length > 0
-            ? this.availableRealmIds.shift()
-            : this.nextRealmId++;
+        return this.realmIds.assign();
     }
 
     public getConfig(): IConfig {
@@ -365,9 +358,8 @@ export default class RelayManager implements IRelayManager {
 
             // Remove the realm from the list
             if (currentRealm.id >= this.config.publicRealmCount) {
-                this.availableRealmIds.push(currentRealm.id);
+                this.realmIds.unassign(currentRealm.id);
             }
-            this.availableRealmIds.splice(this.availableRealmIds.indexOf(currentRealm.id), 1);
 
             // Move on to checking parent realm
             currentRealm = currentRealm.parentRealm;
@@ -409,6 +401,9 @@ export default class RelayManager implements IRelayManager {
                 for (const realmToCreate of rootRealm.enumerate()) {
                     const parentRealmId = realmToCreate.parentRealm?.id ?? null;
                     const parentRealmInstance = parentRealmId ? this.realms[parentRealmId] : null;
+                    if (realmToCreate.id >= this.config.publicRealmCount) {
+                        this.realmIds.reserve(realmToCreate.id);
+                    }
                     this.createRealm(realmToCreate.id, parentRealmInstance, realmToCreate.persisted);
                 }
             }

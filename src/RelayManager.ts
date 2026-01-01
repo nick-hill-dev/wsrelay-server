@@ -197,13 +197,13 @@ export default class RelayManager implements IRelayManager {
         // TODO: Need to test joining/leaving realms and ensure things work and all the messages are sent in the correct order
 
         // Don't do anything if the user is staying in the same realm
-        let becomingRealmless = targetRealmId === -1;
+        const becomingRealmless = targetRealmId === -1;
         if ((user.realm === null && becomingRealmless) || (user.realm !== null && user.realm.id === targetRealmId)) {
             return;
         }
 
         // Child realms can only be created if user is currently in a realm
-        let oldRealm = user.realm;
+        const oldRealm = user.realm;
         let makeChild = option === 'temporaryChildRealm' || option === 'persistedChildRealm';
         let persist = option === 'persistedChildRealm';
         if (oldRealm === null && makeChild) {
@@ -220,7 +220,7 @@ export default class RelayManager implements IRelayManager {
         // Add the user to the new realm, creating it if necessary
         const existingRealm = this.realms[targetRealmId];
         let newRealm: RelayRealm = null;
-        let creatingOrJoiningRealm = targetRealmId !== -1;
+        const creatingOrJoiningRealm = targetRealmId !== -1;
         if (creatingOrJoiningRealm) {
             newRealm = existingRealm;
             if (!newRealm) {
@@ -232,9 +232,9 @@ export default class RelayManager implements IRelayManager {
             this.makeUserJoinRealm(user, newRealm, makeChild);
         }
 
-        // Advise everyone in the old realm that there is a new child realm
-        if (makeChild && !existingRealm) {
-            for (let realmUser of oldRealm.users) {
+        // Advise everyone in the parent realm that there is a new child realm
+        if (makeChild && !existingRealm && oldRealm !== null) {
+            for (const realmUser of oldRealm.users) {
                 this.sendUtf8(realmUser, `{${newRealm.id}`);
             }
         }
@@ -359,6 +359,7 @@ export default class RelayManager implements IRelayManager {
             // Remove the realm from the list
             if (currentRealm.id >= this.config.publicRealmCount) {
                 this.realmIds.unassign(currentRealm.id);
+                this.realms[currentRealm.id] = undefined;
             }
 
             // Move on to checking parent realm

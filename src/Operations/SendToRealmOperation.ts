@@ -6,6 +6,8 @@ export class SendToRealmOperation implements IUtf8Operation {
 
     public targetRealmId: number;
 
+    public sendToAll: boolean = false;
+
     public message: string;
 
     public decode(command: string, message: string): void {
@@ -14,18 +16,34 @@ export class SendToRealmOperation implements IUtf8Operation {
             throw new Error('Unexpected command symbol.');
         }
 
-        this.targetRealmId = parseInt(command.substring(1));
+        const fragment = command.substring(1);
+        const commaIndex = fragment?.indexOf(',') ?? -1;
+        if (commaIndex === -1) {
+            this.targetRealmId = parseInt(fragment);
+            this.sendToAll = false;
+        } else {
+            this.targetRealmId = parseInt(fragment.substring(0, commaIndex));
+            this.sendToAll = fragment.substring(commaIndex + 1) === '*';
+        }
+
         this.message = message;
     }
 
     public execute(senderUser: RelayUser, manager: IRelayManager): void {
-        let targetRealm = manager.getRealmById(this.targetRealmId);
+
+        const targetRealm = manager.getRealmById(this.targetRealmId);
         if (senderUser.realm === null || !targetRealm || targetRealm.users.length === 0) {
             return;
         }
 
-        let targetUser = targetRealm.users[0];
-        manager.sendUtf8(targetUser, `@${senderUser.id} ${this.message}`);
+        const encodedPacket = `@${senderUser.id} ${this.message}`;
+
+        for (const targetUser of targetRealm.users) {
+            manager.sendUtf8(targetUser, encodedPacket);
+            if (!this.sendToAll) {
+                break;
+            }
+        }
     }
 
 }

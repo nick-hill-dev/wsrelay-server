@@ -5,20 +5,28 @@
   "main": "bin/app.js",
   "scripts": {
     "build": "tsc -b",
-    "start": "npx ts-node src/app.ts"
+    "start": "npm run build && node bin/app.js"
   },
   "keywords": [
     "wsrelay"
   ],
   "author": "Nicholas Hill",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nick-hill-dev/wsrelay-server"
+  },
+  "homepage": "https://store.nick-hill.com/server/wsrelay",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "dependencies": {
-    "@types/websocket": "^1.0.5",
     "jose": "^5.9.6",
     "websocket": "^1.0.34"
   },
   "devDependencies": {
     "@types/node": "^18.11.18",
-    "ts-node": "^10.9.1"
+    "@types/websocket": "^1.0.5",
+    "typescript": "^5.0.0"
   }
 }

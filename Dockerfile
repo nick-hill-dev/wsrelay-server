@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:20-alpine AS build
 WORKDIR /app
 
 # Build deps for node-gyp
@@ -10,8 +10,9 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src/ ./src/
 RUN npm run build
+RUN npm prune --omit=dev
 
-FROM node:22-alpine
+FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -19,7 +20,11 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/bin ./bin
 COPY config/defaultConfig.json ./config/defaultConfig.json
 
-RUN mkdir -p /app/data && chown -R node:node /app/data
+RUN rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx \
+    && mkdir -p /app/data \
+    && chown -R node:node /app/data
 
 USER node
 EXPOSE 22002

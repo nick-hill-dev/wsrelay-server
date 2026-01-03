@@ -157,6 +157,19 @@ Example: `<12,cards 12 32 7` - There is data from realm 12 called "cards" whose 
 
 The commands that can be sent to a WebSocket Relay server are as follows.
 
+### `~t v` - Identify
+
+Identify yourself using a name or a JWT token. Identification is generally optional.
+
+Format: `~t v`
+
+- Parameter: `t`: The type. Either `name` or `jwt`.
+- Parameter: `v`: The value, either the name (for `name` type) or a JWT token (for `jwt` type).
+
+Example: `~name Nick` - Identify as Nick.
+
+Example: `~jwt eyJhbGci...` - Identify via JWT.
+
 ### `^x` - Join realm number x
 
 Used to change the user's realm.
@@ -214,15 +227,18 @@ Format: `* s`
 
 Example: `* Hello everyone including me!` - Send message "Hello everyone including me!" to everyone, including me.
 
-### `:x s` - Send string s to all users in realm x
+### `:x s` - Send string s to first (or all) user(s) in realm x
 
 Send a message to every person in the specified realm.
 
-Format: `:x s`
+Format: `:x,n s`
 
 - Parameter `x`: The number of the realm to send the message to.
+- Parameter `n`: Optional. If `*`, sends to all users in realm. If absent (or `@`), sends to first user in realm.
 
-Example: `:3 Hello realm 3!` - Send message "Hello realm 3!" to everyone currently in realm 3.
+Example: `:3 Hello realm 3!` - Send message "Hello realm 3!" to first person currently in realm 3.
+
+Example: `:3,* Hello realm 3!` - Send message "Hello realm 3!" to everyone currently in realm 3.
 
 ### `>k s` - Save realm data s using key k
 

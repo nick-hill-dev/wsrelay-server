@@ -46,6 +46,12 @@ See above for environment variables which can be set to configure without having
 
 ---
 
+## Example Applications
+
+- [PlayGrid](https://home.nick-hill.com/games/playgrid/) uses WSRelay Server. Try opening multiple tabs to see it in action!
+
+- For a very basic HTML-only demo, [go here](https://home.nick-hill.com/static/wsrelay-demo.html) to explore a basic messaging application. Examine the HTML for a simple use case of the client library, which resides in [GitHub](https://github.com/nick-hill-dev/wsrelay-client) (there's also a static [built version of the client library JS file](https://home.nick-hill.com/static/wsrelay.js)).
+
 ## Features
 
 - Allows web browsers on different machines to communicate with one another via the relay.

@@ -1,29 +1,50 @@
 # WebSocket Relay Server
 
-The WebSocket Relay server is a node-based websocket communications server enabling users across different web browsers and machines to communicate with each other, often for the purpose of collaboration. For example, WSRelay enables online chat or multiplayer gaming between groups of people without the machines needing to have knowledge of each other directly. Users can simply load a web page and are connected to each other.
+WebSocket Relay Server facilitates P2P-style communication between different browser users, without any WebRTC faff. It acts as an intermediatory relaying messages between users and can support scenarios such as online chat or multiplayer gaming.
 
-Web pages that make use of a WebSocket Relay server must understand and transmit messages using the WebSocket Relay protocol. The WebSocket Relay protocol is described in detail in the [PROTOCOL.md](PROTOCOL.md) file. The [WebSocket Relay Client library](https://github.com/nick-hill-dev/wsrelay-client) can be used to simplify communications to and from a WebSocket Relay server in your client applications.
+Web pages that make use of a WebSocket Relay server must understand and transmit messages using the [WebSocket Relay protocol](PROTOCOL.md). The [WebSocket Relay Client library](https://github.com/nick-hill-dev/wsrelay-client) has been created to simplify communications to and from a WebSocket Relay server in your client applications without needing to have a deep understanding of the protocol.
 
 ## Quick Start
 
-1. Prepare Development Environment: `npm install`
-1. Run with `npm start`
+**Public Docker Container:**
 
-Alternatively, instead of using `npm start` (which uses `npx` and `ts-node` internally), you can build via TypeScript and run directly:
+Use the published container image in Docker Hub:
 
 ```bash
-cp ./config/defaultConfig.json ./config/config.json
-tsc -b
-node bin/app.js
+docker run -p 22002:22002 nicholashill/wsrelay:latest
 ```
 
-Or, build a Docker container:
+Supply any number of environment variables to configure the server:
+
+- `ACCEPTED_ORIGINS`, to override which origins to permit (I.E. https://whatever), defaults as `*` for all.
+- `ACCEPTED_PROTOCOLS`: to override which websocket protocols to permit, defaults as `*` for all.
+
+Alternatively, mount a volume with an alternative config.json file, and optionally mount a volume to persist data, as per the below example. See the "Configuration" section for more details.
 
 ```bash
-tsc -b
+docker run -p 22002:22002 \
+    -v /var/dockerVolumes/wsrelay/config:/app/config \
+    -v /var/dockerVolumes/wsrelay/data:/app/data \
+    nicholashill/wsrelay:latest
+```
+
+**NPM:**
+
+Run `npm install` then `npm start`.
+
+**Private Docker Container:**
+
+You can build a Docker container yourself from source:
+
+```bash
+npm install
 docker build -t wsrelay:latest . # For Raspberry Pi add this parameter: --platform linux/arm64/v8
-docker run wsrelay:latest # If you want to run it now
+docker run -p 22002:22002 wsrelay:latest # If you want to run it now
 ```
+
+See above for environment variables which can be set to configure without having to set up a volume for a bespoke configuration file.
+
+---
 
 ## Features
 
@@ -35,8 +56,10 @@ docker run wsrelay:latest # If you want to run it now
 - Distinction between permanent realms and temporary realms.
 - Can create or join child realms belonging to a parent realm, in a tree-like structure.
 - Can save data to realms and load data from them.
-- Supports automatic synchronisation of file data for all connected users.
+- Supports automatic synchronisation of file data for all connected users, including experimental support for Fully Synchronised Entities (FSEs).
 - Support for communication across different realms.
+- Can authenticte with bearer tokens or simple unsecured identity.
+- Support for binary commands.
 - Can implement custom protocols on top of the basic WebSocket Relay protocol for highly customised applications.
 - Can specify which specific origins to accept, or all.
 - Can specify which specific websocket protocols to accept, or all.
@@ -45,7 +68,7 @@ docker run wsrelay:latest # If you want to run it now
 
 ## Configuration
 
-The service is configured via config.json as follows:
+The service can be configured by creating a config file `config/config.json`. If this file does not exist WSRelay will load `config/defaultConfig.json` instead, which has been included in the package.
 
 ```jsonc
 {
@@ -61,9 +84,12 @@ The service is configured via config.json as follows:
     "fsePath": "./data", // Storage location for Fully Synchronised Entities. Defaults to the value of "entityPath".
     "fseMaxSize": 131072, // The maximum size of a FSE. Defaults to 131072 (128KB).
     "logIncoming": false, // Indicates whether or not to write messages to the console based on what messages the server has received.
-    "logOutgoing": false // Indicates whether or not to write messages to the console based on what messages the server has sent.
+    "logOutgoing": false, // Indicates whether or not to write messages to the console based on what messages the server has sent.
+    "jwt": { /* ... */ } // Optional, if you want JWT authentication (experimental and not used very much)
 }
 ```
+
+See `JWT.md` for JWT configuration options.
 
 ## Example Usage
 
@@ -85,6 +111,7 @@ There is no direct support for the wss:// protocol at present but it is possible
 
 - **2.0**: Initial release.
 - **2.1**: Support for a binary version of the WSRelay protocol as well as support for Fully Synchronised Entities.
+- **2.2**: Support for persisted child realms, some small improvements, some critical bug fixes and publish first image to Docker.
 
 ## C# Version (2019)
 

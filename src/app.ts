@@ -10,6 +10,15 @@ let configPath = fs.existsSync('./config/config.json') ? './config/config.json' 
 let configText = fs.readFileSync(configPath, 'utf8');
 let config = <IConfig>JSON.parse(configText);
 
+const env = process.env;
+config.port = env.PORT ? parseInt(env.PORT) : config.port;
+config.entityPath = env.DATA_DIR ?? config.entityPath;
+config.fsePath = env.DATA_DIR ?? env.FSE_DIR ?? config.fsePath;
+config.acceptedOrigins = env.ACCEPTED_ORIGINS ? env.ACCEPTED_ORIGINS.split(',') : config.acceptedOrigins;
+config.acceptedProtocols = env.ACCEPTED_PROTOCOLS ? env.ACCEPTED_PROTOCOLS.split(',') : config.acceptedProtocols;
+config.logIncoming = env.LOG_INCOMING ? env.LOG_INCOMING === "true" : config.logIncoming;
+config.logOutgoing = env.LOG_OUTGOING ? env.LOG_OUTGOING === "true" : config.logOutgoing;
+
 if (!fs.existsSync(config.entityPath)) {
     fs.mkdirSync(config.entityPath);
 }

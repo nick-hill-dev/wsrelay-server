@@ -2,8 +2,8 @@ $ErrorActionPreference = "Stop"
 
 # Push to Hill Cloud Container Registry
 
-Write-Host "> npm run build" -ForegroundColor Cyan
-& npm run build
+Write-Host "> npm install" -ForegroundColor Cyan
+& npm install
 
 Write-Host "> docker build" -ForegroundColor Cyan
 & docker build -t wsrelay:latest . --platform linux/arm64/v8

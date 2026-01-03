@@ -23,8 +23,8 @@ Write-Host "> docker run" -ForegroundColor Cyan
 & docker -H containers run -d `
     --restart=always `
     --name $Name `
-    -v /var/dockerVolumes/wsrelay/config:/usr/src/app/config `
-    -v /var/dockerVolumes/wsrelay/data:/usr/src/app/data `
+    -v /var/dockerVolumes/wsrelay/config:/app/config `
+    -v /var/dockerVolumes/wsrelay/data:/app/data `
     -p 22002:22002 `
     hccr.nick-hill.com/$($Name):latest
 

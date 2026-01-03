@@ -1,11 +1,11 @@
 {
   "name": "wsrelay",
-  "version": "1.1.1",
+  "version": "2.2.0",
   "description": "WebSocket Relay Server",
   "main": "bin/app.js",
   "scripts": {
     "build": "tsc -b",
-    "start": "node -e \"if (!require('fs').existsSync('config/config.json')) require('fs').copyFileSync('config/defaultConfig.json', 'config/config.json');\" && npx ts-node src/app.ts"
+    "start": "npx ts-node src/app.ts"
   },
   "keywords": [
     "wsrelay"

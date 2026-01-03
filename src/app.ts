@@ -6,7 +6,8 @@ import { connection, request, server as WSServer } from 'websocket';
 import * as http from 'http';
 import fs from 'fs';
 
-let configText = fs.readFileSync('./config/config.json', 'utf8');
+let configPath = fs.existsSync('./config/config.json') ? './config/config.json' : './config/defaultConfig.json';
+let configText = fs.readFileSync(configPath, 'utf8');
 let config = <IConfig>JSON.parse(configText);
 
 if (!fs.existsSync(config.entityPath)) {
@@ -27,7 +28,10 @@ let server = http.createServer((request, response) => {
 });
 
 server.listen(config.port, () => {
-    console.log('WebSocket Relay Server. Version 2.1 written by Nicholas Hill.');
+    console.log('WebSocket Relay Server. Version 2.2 written by Nicholas Hill.');
+    console.log();
+    console.log(`Loaded configuration from: ${configPath}`);
+    console.log();
     console.log('Connections will be accepted from the following origins: ' + config.acceptedOrigins.join(', '));
     console.log('Connections will be accepted for the following protocols: ' + config.acceptedProtocols.join(', '));
     console.log(`Listening on port ${config.port}.`);

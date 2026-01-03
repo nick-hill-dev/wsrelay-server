@@ -63,7 +63,7 @@ export class Fse {
             return new Fse(fileName);
         }
         const data = fs.readFileSync(fileName);
-        const fse = new Fse(fileName, data);
+        const fse = new Fse(fileName, new Uint8Array(data.buffer, data.byteOffset, data.length));
         fse.changed = false;
         return fse;
     }

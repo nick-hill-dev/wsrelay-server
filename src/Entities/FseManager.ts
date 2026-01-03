@@ -34,7 +34,7 @@ export default class FseManager {
         }
 
         const fse = this.getOrCreateFse(realmId, entityName);
-        fse.setBytes(0, data);
+        fse.setBytes(0, new Uint8Array(data.buffer, data.byteOffset, data.length));
 
         if (!fs.existsSync(fse.fileName)) {
             fse.save();
@@ -54,7 +54,7 @@ export default class FseManager {
         }
 
         const fse = this.getOrCreateFse(realmId, entityName);
-        fse.setBytes(position, data);
+        fse.setBytes(position, new Uint8Array(data.buffer, data.byteOffset, data.length));
 
         return fse.getSubscribedUsers();
     }

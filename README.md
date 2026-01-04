@@ -52,6 +52,7 @@ See above for environment variables which can be set to configure without having
 
 - For a very basic HTML-only demo, [go here](https://home.nick-hill.com/static/wsrelay-demo.html) to explore a basic messaging application. Examine the HTML for a simple use case of the client library, which resides in [GitHub](https://github.com/nick-hill-dev/wsrelay-client) (there's also a static [built version of the client library JS file](https://home.nick-hill.com/static/wsrelay.js)).
 
+- See [demo/index.html](demo/index.html) for an example on directly calling the server, without support of the Client Library. Use cases like this require comprehensive understanding of the [protocol](PROTOCOL.md).
 ## Features
 
 - Allows web browsers on different machines to communicate with one another via the relay.
@@ -95,11 +96,7 @@ The service can be configured by creating a config file `config/config.json`. If
 }
 ```
 
-See `JWT.md` for JWT configuration options.
-
-## Example Usage
-
-See [demo/index.html](demo/index.html) for an example on directly calling the server, without support of the [WebSocket Relay Client library](https://github.com/nick-hill-dev/wsrelay-client). Use cases like this require comprehensive understanding of the [protocol](PROTOCOL.md).
+See [`JWT.md`](./JWT.md) for JWT configuration options.
 
 ## Secure WebSocket
 
